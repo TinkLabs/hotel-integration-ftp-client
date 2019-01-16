@@ -3,3 +3,8 @@ node_modules
 
 # secret
 .env
+
+# data
+/upload/sample-data.txt
+/upload
+/download

@@ -6,6 +6,8 @@
     },
     "extends": "airbnb-base",
     "rules": {
-      "no-console": "off"
+      "no-console": "off",
+      "prefer-const": "off",
+      "no-var": "off"
     }
   }
