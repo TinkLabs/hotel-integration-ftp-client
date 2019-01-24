@@ -7,7 +7,7 @@ import db from './src/database/knex';
 
 
 // Aysnc Sub-thread sript
-async function subThread(hotelId, ftpConfig, fileConfig, socket) {
+async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
   try {
     const cli = new System(hotelId, ftpConfig, fileConfig);
     const fileList = await cli.getDir();
@@ -17,21 +17,30 @@ async function subThread(hotelId, ftpConfig, fileConfig, socket) {
       const res = await cli.getData(file);
 
       if (await socket.send(res)) {
-        console.log(Chalk.green(new Date().toISOString(), ': '), `[Send event] Hotel[${hotelId}] ${file}`);
-        // await cli.deleteFile(file);
+        console.log(
+          Chalk.green(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ': '),
+          `[Send event] Hotel[${hotelId}] ${file}`,
+        );
+        await cli.deleteFile(file);
       }
-
-      // update the db record
-      await db('integration_ftp')
-        .where('hotel_id', hotelId)
-        .update({ last_connect: db.fn.now() });
     }).catch((err) => {
       // Error handling
-      console.log(Chalk.red(new Date().toISOString(), ':'), `Hotel[${hotelId}]_fileError ${err}`);
+      console.log(
+        Chalk.red(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
+        `[File Error]Hotel[${hotelId}] ${err}`,
+      );
+    }).finally(async () => {
+      // update the db record
+      await db('integration_ftp')
+        .where('id', ftpId)
+        .update({ last_connected: db.fn.now() });
     });
   } catch (err) {
     // Error handling
-    console.log(Chalk.red(new Date().toISOString(), ':'), `Hotel[${hotelId}] ${err}`);
+    console.log(
+      Chalk.red(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
+      `[Error] Hotel[${hotelId}] ${err}`,
+    );
   }
 }
 
@@ -39,19 +48,18 @@ async function subThread(hotelId, ftpConfig, fileConfig, socket) {
 async function run() {
   // select the ftp, file setting
   let res = await db('integration_ftp')
-    .whereRaw('NOW() > DATE_ADD(`last_connect`, INTERVAL `time_interval` MINUTE)')
-    .select();
-
-  // set up socket client
-  const socket = new Socket('FTP');
+    .whereRaw('NOW() > DATE_ADD(`last_connected`, INTERVAL `time_interval` MINUTE)')
+    .leftJoin('integrations', 'integration_ftp.integration_id', 'integrations.id')
+    .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config');
 
   await Promise.all(
     res.map(async (record) => {
       await subThread(
+        record.id,
         record.hotel_id,
         JSON.parse(record.ftp_config || '{}'),
         JSON.parse(record.file_config || '{}'),
-        socket,
+        new Socket(record.integration_id, record.system_code), // set up socket client
       );
       return record;
     }),
@@ -70,4 +78,6 @@ async function run() {
 //   // start the service
 //   run();
 // })).start();
+
+
 run();

@@ -66,11 +66,14 @@ function fieldValConvert(key, val = '') {
     case 'actual_checkin_date':
     case 'actual_checkout_date':
     case 'actual_dep_date':
+    case 'arrival_date':
     case 'booking_date':
     case 'cancel_date':
-    case 'insert_date':
-    case 'arrival_date':
+    case 'checkin_date':
+    case 'checkout_date':
+    case 'date_of_birth':
     case 'departure_date':
+    case 'insert_date':
       return val !== '' ? dateformat(val, 'yyyy-mm-dd') : '';
     case 'arrival_time':
     case 'departure_time':

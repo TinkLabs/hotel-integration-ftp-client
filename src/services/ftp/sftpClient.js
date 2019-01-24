@@ -91,5 +91,8 @@ export default class SftpClient extends EventEmitter {
     this.conn = new ssh2.Client();
 
     // TODO: add listener
+    this.conn.on('error', (err) => {
+      this.emit('error', err);
+    });
   }
 }

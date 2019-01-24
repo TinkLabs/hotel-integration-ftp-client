@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import Chalk from 'chalk';
 import { parser } from './helpers';
 import SftpClient from '../services/ftp/sftpClient';
 
@@ -26,8 +27,10 @@ export default class System extends EventEmitter {
     let raw = await this.ftp.dowmloadFile(fileName);
 
     return parser(
-      raw, setting.header, setting.footer,
-      setting.recordSplit, setting.fieldSplit, setting.dataSchema,
+      raw,
+      setting.ignoredTop, setting.ignoredBot,
+      setting.recordSplit, setting.fieldSplit,
+      setting.dataSchema,
     );
   }
 
@@ -52,9 +55,8 @@ export default class System extends EventEmitter {
       console.log('ftp.diconnect');
     });
 
-    this.ftp.on('error', (error) => {
-      this.emit('ftp.error', error);
-      console.log('ftp.error: ', error);
+    this.ftp.on('error', (err) => {
+      console.log(Chalk.red(new Date().toISOString(), ':'), `[FTP Error] Hotel[${this.hotelId}] `, JSON.stringify(err));
     });
   }
 }

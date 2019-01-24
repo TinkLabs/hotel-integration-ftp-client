@@ -1,11 +1,12 @@
-FROM keymetrics/pm2:8-stretch
+FROM node:10-jessie-slim
 
 # Bundle APP files
 COPY src /app/src
 COPY package.json /app
-COPY app.config.js /app
+COPY app.js /app
 # env
-COPY .env app/.
+COPY .env /app
+COPY .babelrc /app
 
 # Set working directory
 WORKDIR /app
@@ -13,6 +14,4 @@ WORKDIR /app
 # Install app dependencies
 RUN npm install
 
-# Expose the listening port
-EXPOSE 80
-
+CMD ["npm", "start"]

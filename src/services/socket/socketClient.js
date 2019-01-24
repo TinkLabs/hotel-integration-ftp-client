@@ -2,10 +2,11 @@ import EventEmitter from 'events';
 import io from 'socket.io-client';
 
 export default class SocketClient extends EventEmitter {
-  constructor(systemCode) {
+  constructor(integrationId, systemCode) {
     super();
     this.socket = null;
     this.systemCode = systemCode;
+    this.integration_id = integrationId;
 
     this.initSocket();
   }
@@ -24,7 +25,7 @@ export default class SocketClient extends EventEmitter {
       query: {
         token: process.env.SOCKET_TOKEN,
         system_code: this.systemCode,
-        integration_id: 8700,
+        integration_id: this.integration_id,
       },
     });
 
