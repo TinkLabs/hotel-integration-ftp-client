@@ -5,22 +5,21 @@ import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
 
-
 // Aysnc Sub-thread sript
 async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
   try {
     const cli = new System(hotelId, ftpConfig, fileConfig);
     const fileList = await cli.getDir();
 
-
     await Promise.each(fileList, async (file) => {
       const res = await cli.getData(file);
 
       if (await socket.send(res)) {
         console.log(
-          Chalk.green(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ': '),
+          Chalk.green(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
           `[Send event] Hotel[${hotelId}] ${file}`,
         );
+        // delete file on remote side
         await cli.deleteFile(file);
       }
     }).catch((err) => {
@@ -66,18 +65,18 @@ async function run() {
   );
 }
 
-// // schedule job in every minute
-// Cron.job('* * * * *', (() => {
-//   console.log(
-//     Chalk.bgBlue(
-//       new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''),
-//       '  Main thread start',
-//     ),
-//   );
+// opening console log
+console.log(
+  Chalk.green(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
+  '[hotel-integration ftp client start]',
+);
 
-//   // start the service
-//   run();
-// })).start();
-
-
-run();
+// schedule job in every minute
+Cron.job('* * * * *', (() => {
+  console.log(
+    Chalk.blue(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
+    'Main thread start',
+  );
+  // start the service
+  run();
+})).start();

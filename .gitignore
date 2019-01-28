@@ -3,6 +3,7 @@ node_modules
 
 # secret
 .env
+hig-ftp-client.env
 
 # data
 /upload/sample-data.txt
