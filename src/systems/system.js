@@ -17,7 +17,12 @@ export default class System extends EventEmitter {
   }
 
   async getDir() {
-    return this.ftp.getDir().map(data => data.filename);
+    return this.ftp.getDir().map((data) => {
+      return {
+        file_name: data.filename,
+        last_modified: data.attrs.mtime,
+      }
+    });
   }
 
   async getData(fileName) {

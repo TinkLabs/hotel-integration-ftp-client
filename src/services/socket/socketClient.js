@@ -2,9 +2,10 @@ import EventEmitter from 'events';
 import io from 'socket.io-client';
 
 export default class SocketClient extends EventEmitter {
-  constructor(integrationId, systemCode) {
+  constructor(integrationId, systemCode, token) {
     super();
     this.socket = null;
+    this.token = token;
     this.systemCode = systemCode;
     this.integration_id = integrationId;
 
@@ -13,7 +14,7 @@ export default class SocketClient extends EventEmitter {
 
   // send data to pms
   send(raw) {
-    const data = { event: 'RESERVATIONS', data: { reservations: raw } };
+    const data = { event: 'RESERVATIONS', data: raw };
 
     this.socket.emit('pms_data', data);
     return true;
@@ -23,9 +24,7 @@ export default class SocketClient extends EventEmitter {
     this.socket = io(process.env.SOCKET_URL, {
       path: process.env.SOCKET_PATH,
       query: {
-        token: process.env.SOCKET_TOKEN,
-        system_code: this.systemCode,
-        integration_id: this.integration_id,
+        token: this.token,
       },
     });
 
