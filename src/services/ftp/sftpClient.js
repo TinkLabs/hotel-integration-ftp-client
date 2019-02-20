@@ -4,6 +4,7 @@ import ssh2 from 'ssh2';
 import Promise from 'bluebird';
 import path from 'path';
 import aws from 'aws-sdk';
+import timestamp from 'time-stamp';
 
 export default class SftpClient extends EventEmitter {
   constructor(hotelId, config, remote) {
@@ -11,7 +12,7 @@ export default class SftpClient extends EventEmitter {
 
     this.conn = null;
     this.config = config;
-    this.remote = remote;
+    this.remote = path.join('.', remote);
     this.hotelId = hotelId;
     this.s3 = new aws.S3({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -19,12 +20,21 @@ export default class SftpClient extends EventEmitter {
       region: process.env.AWS_DEFAULT_REGION,
     });
 
-    this.initFtp();
-  }
+    const busketName = 'hig2-ftp-data';
+    switch (process.env.ENV_STAGE.toLowerCase()) {
+      case 'prod':
+        this.s3Busket = busketName;
+        break;
+      case 'stg':
+        this.s3Busket = `${busketName}-staging`;
+        break;
+      case 'dev':
+      default:
+        this.s3Busket = `${busketName}-dev`;
+        break;
+    }
 
-  async getS3List() {
-    return this.s3.listObjects({ Bucket: 'hig2-ftp-data' }).promise()
-      .then(data => data).catch((err) => { console.log(err); });
+    this.initFtp();
   }
 
   async getDir() {
@@ -54,14 +64,17 @@ export default class SftpClient extends EventEmitter {
           if (connErr) reject(connErr);
           // destination path
           const remotePath = path.join(this.remote, fileName);
-          const storePath = path.join(this.hotelId !== 'string' ? this.hotelId.toString() : this.hotelId, fileName);
+          const storePath = path.join(
+            this.hotelId !== 'string' ? this.hotelId.toString() : this.hotelId,
+            `${timestamp.utc('YYYYMMDDHHmmss')}_${fileName}`,
+          );
 
           // download file
           sftp.readFile(remotePath, encode, (err, buff) => {
             if (err) reject(err);
 
             // upload data to s3
-            this.s3.putObject({ Bucket: 'hig2-ftp-data', Key: storePath, Body: buff })
+            this.s3.putObject({ Bucket: this.s3Busket, Key: storePath, Body: buff })
               .promise()
               .then(() => { resolve(buff.toString(encode).trim()); })
               .catch((uploadErr) => { reject(uploadErr); });

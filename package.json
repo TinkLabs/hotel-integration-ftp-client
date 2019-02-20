@@ -12,6 +12,7 @@
     "aws-sdk": "^2.392.0",
     "bluebird": "^3.5.3",
     "chalk": "^2.4.2",
+    "chunk": "0.0.2",
     "cron": "^1.6.0",
     "dateformat": "^3.0.3",
     "dot-prop": "^4.2.0",
@@ -26,6 +27,7 @@
     "request-promise": "^4.2.2",
     "socket.io-client": "^2.2.0",
     "ssh2": "^0.8.0",
+    "time-stamp": "^2.2.0",
     "uuid": "^3.3.2"
   },
   "devDependencies": {
