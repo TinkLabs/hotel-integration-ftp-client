@@ -2,6 +2,8 @@ import Cron from 'cron';
 import Chalk from 'chalk';
 import Promise from 'bluebird';
 import chunk from 'chunk';
+import uuid from 'uuid/v4';
+
 import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
@@ -18,6 +20,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       Promise.each(chunk_records, async (chunk_record) => {
         let records_message = {
           meta: {
+            id: uuid(),
             total_record: res.length,
             num_of_records: chunk_record.length,
             file_name: file.file_name,
@@ -37,6 +40,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       });
     }).catch((err) => {
       // Error handling
+      console.log(err);
       console.log(
         Chalk.red(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
         `[File Error]Hotel[${hotelId}] ${err}`,
