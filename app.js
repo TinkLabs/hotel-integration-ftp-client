@@ -20,7 +20,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       Promise.each(chunk_records, async (chunk_record) => {
         let records_message = {
           meta: {
-            id: uuid(),
+            chunk_id: uuid(),
             total_record: res.length,
             num_of_records: chunk_record.length,
             file_name: file.file_name,
