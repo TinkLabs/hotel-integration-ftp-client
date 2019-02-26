@@ -1,0 +1,9 @@
+version: "3.3"
+services: 
+  sftp:
+    image: atmoz/sftp
+    volumes: 
+      - ./ftp_server:/home/foo/upload
+    ports:
+      - "2222:22"
+    command: foo:pass
