@@ -12,7 +12,10 @@ import db from './src/database/knex';
 async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
   try {
     const cli = new System(hotelId, ftpConfig, fileConfig);
-    const fileList = await cli.getDir();
+    let fileList = await cli.getDir();
+    fileList = fileList.sort((file1, file2) => {
+      return file1.last_modified > file2.last_modified;
+    });
 
     await Promise.each(fileList, async (file) => {
       const res = await cli.getData(file.file_name);
@@ -20,7 +23,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       Promise.each(chunk_records, async (chunk_record) => {
         let records_message = {
           meta: {
-            id: uuid(),
+            chunk_id: uuid(),
             total_record: res.length,
             num_of_records: chunk_record.length,
             file_name: file.file_name,
