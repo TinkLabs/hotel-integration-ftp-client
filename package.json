@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "babel-node app.js"
+    "start": "babel-node app.js",
+    "start_ftp": "npm run copy_file_ftp && docker-compose up",
+    "copy_file_ftp": "cp -r data/. ftp_server"
   },
   "author": "",
   "license": "ISC",
