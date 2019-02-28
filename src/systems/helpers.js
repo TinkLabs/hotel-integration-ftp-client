@@ -50,7 +50,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         num_adults: !empty(record.num_adults) ? parseInt(record.num_adults): 0,
         num_children: !empty(record.num_children) ? parseInt(record.num_children) : 0,
         accompanying: !empty(record.accompanying) ? record.accompanying : "",
-        room_no: !empty(record.room_no) ? record.room_no : "",
+        room_number: !empty(record.room_number) ? record.room_number : "",
         room_type: !empty(record.room_type) ? record.room_type : "",
         room_class: !empty(record.room_class) ? record.room_class : "",
         room_type_code: !empty(record.room_type_code) ? record.room_type_code: "",
