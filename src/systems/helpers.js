@@ -47,8 +47,8 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         booking_date: !empty(record.booking_date) ? moment(record.booking_date, "YYYY-MMM-DD").format("YYYY-MM-DD") : "",
         cancel_date: !empty(record.cancel_date) ? moment(record.cancel_date, "YYYY-MMM-DD").format("YYYY-MM-DD") : "",
         cancel_id: !empty(record.cancel_id) ? record.cancel_id : "",
-        num_adults: !empty(record.num_adults) ? record.num_adults: 0,
-        num_children: !empty(record.num_children) ? record.num_children : 0,
+        num_adults: !empty(record.num_adults) ? parseInt(record.num_adults): 0,
+        num_children: !empty(record.num_children) ? parseInt(record.num_children) : 0,
         accompanying: !empty(record.accompanying) ? record.accompanying : "",
         room_no: !empty(record.room_no) ? record.room_no : "",
         room_type: !empty(record.room_type) ? record.room_type : "",
@@ -67,7 +67,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         last_name: !empty(record.last_name) ? record.last_name: "",
         gender: !empty(record.gender) ? record.gender : "",
         email: !empty(record.email) ? record.email : "",
-        dob: !empty(record.dob) ? record.dob : "",
+        dob: !empty(record.dob) ? moment(record.dob, "YYYY-MMM-DD").format("YYYY-MM-DD") : "",
         address1: !empty(record.address1) ? record.address1 : "",
         address2: !empty(record.address2) ? record.address2 : "",
         city: !empty(record.city) ? record.city : "",
@@ -90,11 +90,11 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
       },
       renvenue: {
         currency: !empty(record.currency) ? record.currency: "",
-        room_rate_amount: !empty(record.room_rate_amount) ? record.room_rate_amount: 0,
-        food_berverages_amount: !empty(record.food_berverages_amount) ? record.food_berverages_amount: 0,
-        total_room_revenue: !empty(record.total_room_revenue) ? record.total_room_revenue: 0,
-        room_revenue: !empty(record.room_revenue) ? record.room_revenue: 0,
-        total_price_tax: !empty(record.total_price_tax) ? record.total_price_tax: 0,
+        room_rate_amount: !empty(record.room_rate_amount) ? parseFloat(record.room_rate_amount): 0,
+        food_berverages_amount: !empty(record.food_berverages_amount) ? parseFloat(record.food_berverages_amount): 0,
+        total_room_revenue: !empty(record.total_room_revenue) ? parseFloat(record.total_room_revenue): 0,
+        room_revenue: !empty(record.room_revenue) ? parseFloat(record.room_revenue): 0,
+        total_price_tax: !empty(record.total_price_tax) ? parseFloat(record.total_price_tax): 0,
       }
     }
     return result;
