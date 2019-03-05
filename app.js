@@ -69,11 +69,11 @@ async function run() {
   let res = await db('integration_ftp')
     .whereRaw('NOW() > DATE_ADD(`last_connected`, INTERVAL `time_interval` MINUTE)')
     .leftJoin('integrations', 'integration_ftp.integration_id', 'integrations.id')
-    .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config');
+    .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config', 'integrations.token');
 
   await Promise.all(
     res.map(async (record) => {
-      let token = JSON.parse(record.config).token;
+      let token = record.token;
       await subThread(
         record.id,
         record.hotel_id,
