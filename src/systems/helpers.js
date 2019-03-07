@@ -61,6 +61,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         special: !empty(record.special) ? record.special : "",
         room_rate_code: !empty(record.room_rate_code) ? record.room_rate_code : "",
         update_user: !empty(record.update_user) ? record.update_user : "",
+        notes: !empty(record.notes) ? record.notes : "",
       },
       guest: {
         title: !empty(record.title) ? record.title: "",
