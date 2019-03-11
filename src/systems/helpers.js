@@ -8,7 +8,6 @@ import empty from 'is-empty';
 import moment from 'moment';
 
 export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
-  
   let records = raw.split(rdSplit);
   records = _.drop(records, header);
   records = _.dropRight(records, footer);
@@ -21,19 +20,19 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
     
     let checkin_datetime;
     if(!empty(record.checkin_datetime)){
-      checkin_datetime = !empty(record.checkin_datetime) ? moment(record.checkin_datetime, "YYYY-MMM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss") : "";
+      checkin_datetime = !empty(record.checkin_datetime) ? moment(record.checkin_datetime, "DD-MMM-YY HH:mm").format("DD-MM-YYYY HH:mm:ss") : "";
     }
     let checkin_date = !empty(record.checkin_date) ? record.checkin_date : "";
     let checkin_time = !empty(record.checkin_time) ? record.checkin_time : "00:00";
-    checkin_datetime = !empty(record.checkin_date) ? moment(`${record.checkin_date} ${record.checkin_time}`, "YYYY-MMM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss") : "";
+    checkin_datetime = !empty(record.checkin_date) ? moment(`${record.checkin_date} ${record.checkin_time}`, "DD-MMM-YY HH:mm").format("DD-MM-YYYY HH:mm:ss") : "";
     
     let checkout_datetime;
     if(!empty(record.checkout_datetime)){
-      checkout_datetime = !empty(record.checkout_datetime) ? moment(record.checkout_datetime, "YYYY-MMM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss") : "";
+      checkout_datetime = !empty(record.checkout_datetime) ? moment(record.checkout_datetime, "DD-MMM-YY HH:mm").format("DD-MM-YYYY HH:mm:ss") : "";
     }
     let checkout_date = !empty(record.checkout_date) ? record.checkout_date : "";
     let checkout_time = !empty(record.checkout_time) ? record.checkout_time : "00:00";
-    checkout_datetime = !empty(record.checkout_date) ? moment(`${record.checkout_date} ${record.checkout_time}`, "YYYY-MMM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss") : "";
+    checkout_datetime = !empty(record.checkout_date) ? moment(`${record.checkout_date} ${record.checkout_time}`, "DD-MMM-YY HH:mm").format("DD-MM-YYYY HH:mm:ss") : "";
     
     let result = {
       reservation: {
@@ -42,10 +41,10 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         reservation_status: !empty(record.reservation_status) ? record.reservation_status : "",
         checkin_datetime: checkin_datetime,
         checkout_datetime: checkout_datetime,
-        actual_checkin_date: !empty(record.actual_checkin_date) ? moment(record.actual_checkin_date, "YYYY-MMM-DD").format("YYYY-MM-DD") : "",
-        actual_checkout_date: !empty(record.actual_checkout_date) ? moment(record.actual_checkout_date, "YYYY-MMM-DD").format("YYYY-MM-DD"): "",
-        booking_date: !empty(record.booking_date) ? moment(record.booking_date, "YYYY-MMM-DD").format("YYYY-MM-DD") : "",
-        cancel_date: !empty(record.cancel_date) ? moment(record.cancel_date, "YYYY-MMM-DD").format("YYYY-MM-DD") : "",
+        actual_checkin_date: !empty(record.actual_checkin_date) ? moment(record.actual_checkin_date, "DD-MMM-YY").format("DD-MM-YYYY") : "",
+        actual_checkout_date: !empty(record.actual_checkout_date) ? moment(record.actual_checkout_date, "DD-MMM-YY").format("DD-MM-YYYY"): "",
+        booking_date: !empty(record.booking_date) ? moment(record.booking_date, "DD-MMM-YY").format("DD-MM-YYYY") : "",
+        cancel_date: !empty(record.cancel_date) ? moment(record.cancel_date, "DD-MMM-YY").format("DD-MM-YYYY") : "",
         cancel_id: !empty(record.cancel_id) ? record.cancel_id : "",
         num_adults: !empty(record.num_adults) ? parseInt(record.num_adults): 0,
         num_children: !empty(record.num_children) ? parseInt(record.num_children) : 0,
@@ -71,7 +70,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         gender: !empty(record.gender) ? record.gender : "",
         email: !empty(record.email) ? record.email : "",
         mailing_list: !empty(record.mailing_list) ? record.mailing_list : "",
-        dob: !empty(record.dob) ? moment(record.dob, "YYYY-MMM-DD").format("YYYY-MM-DD") : "",
+        dob: !empty(record.dob) ? moment(record.dob, "DD-MMM-YY").format("DD-MM-YYYY") : "",
         address1: !empty(record.address1) ? record.address1 : "",
         address2: !empty(record.address2) ? record.address2 : "",
         city: !empty(record.city) ? record.city : "",
