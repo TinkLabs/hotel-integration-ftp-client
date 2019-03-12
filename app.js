@@ -13,9 +13,13 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
   try {
     const cli = new System(hotelId, ftpConfig, fileConfig);
     let fileList = await cli.getDir();
+    console.log('---not sorted fileList---');
+    console.log(fileList);
     fileList = fileList.sort((file1, file2) => {
       return file1.last_modified > file2.last_modified;
     });
+    console.log('---sorted fileList---')
+    console.log(fileList);
 
     await Promise.each(fileList, async (file) => {
       const res = await cli.getData(file.file_name);
