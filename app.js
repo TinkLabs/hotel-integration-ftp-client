@@ -93,11 +93,11 @@ console.log(
 );
 
 // schedule job in every minute
-Cron.job('* * * * *', (() => {
+/*Cron.job('* * * * *', (() => {
   console.log(
     Chalk.blue(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
     'Main thread start',
   );
   // start the service
   run();
-})).start();
+})).start();*/
