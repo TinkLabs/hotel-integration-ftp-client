@@ -16,7 +16,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log('---not sorted fileList---');
     console.log(notSorted_fileList);
     let fileList = notSorted_fileList.sort((file1, file2) => {
-      return file1.last_modified > file2.last_modified;
+      return file1.last_modified - file2.last_modified;
     });
     console.log('---sorted fileList---')
     console.log(fileList);
