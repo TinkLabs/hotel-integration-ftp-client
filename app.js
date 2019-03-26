@@ -23,7 +23,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
 
     await Promise.each(fileList, async (file) => {
       const res = await cli.getData(file.file_name);
-      let chunk_records = chunk(res, 1000);
+      let chunk_records = chunk(res, 150);
       Promise.each(chunk_records, async (chunk_record) => {
         let records_message = {
           meta: {
@@ -78,13 +78,17 @@ async function run() {
   await Promise.all(
     res.map(async (record) => {
       let token = record.token;
+       // set up socket client
+      let socket = new Socket(record.integration_id, record.system_code, token)
       await subThread(
         record.id,
         record.hotel_id,
         JSON.parse(record.ftp_config || '{}'),
         JSON.parse(record.file_config || '{}'),
-        new Socket(record.integration_id, record.system_code, token), // set up socket client
+        socket,
       );
+      // close socket after subThread.
+      socket.close();
       return record;
     }),
   );
