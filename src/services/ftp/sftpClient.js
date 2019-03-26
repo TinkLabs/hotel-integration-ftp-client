@@ -10,7 +10,6 @@ export default class SftpClient extends EventEmitter {
   constructor(hotelId, config, remote) {
     super();
 
-    this.conn = null;
     this.config = config;
     this.remote = path.join('.', remote);
     this.hotelId = hotelId;
@@ -34,14 +33,15 @@ export default class SftpClient extends EventEmitter {
         break;
     }
 
-    this.initFtp();
   }
 
   async getDir() {
+
+    let conn = this.initFtp();
     return new Promise((resolve, reject) => {
       // add listener to read
-      this.conn.once('ready', () => {
-        this.conn.sftp((connErr, sftp) => {
+      conn.once('ready', () => {
+        conn.sftp((connErr, sftp) => {
           if (connErr) reject(connErr);
           // read remote directory
           sftp.readdir(this.remote, (err, list) => {
@@ -53,14 +53,16 @@ export default class SftpClient extends EventEmitter {
         // sftp connection
       }).connect(this.config);
       // close sftp connection
-    }).finally(() => { this.conn.end(); });
+    }).finally(() => { conn.end(); });
   }
 
   async dowmloadFile(fileName, encode = 'utf8') {
+
+    let conn = this.initFtp();
     return new Promise((resolve, reject) => {
       // add listener to read
-      this.conn.once('ready', () => {
-        this.conn.sftp((connErr, sftp) => {
+      conn.once('ready', () => {
+        conn.sftp((connErr, sftp) => {
           if (connErr) reject(connErr);
           // destination path
           const remotePath = path.join(this.remote, fileName);
@@ -83,13 +85,15 @@ export default class SftpClient extends EventEmitter {
         // sftp connection
       }).connect(this.config);
       // close sftp connection
-    }).finally(() => { this.conn.end(); });
+    }).finally(() => { conn.end(); });
   }
 
   async deleteFile(fileName) {
+
+    let conn = this.initFtp();
     return new Promise((resolve, reject) => {
-      this.conn.once('ready', () => {
-        this.conn.sftp((connErr, sftp) => {
+      conn.once('ready', () => {
+        conn.sftp((connErr, sftp) => {
           if (connErr) reject(connErr);
           sftp.unlink(
             path.join(this.remote, fileName),
@@ -97,15 +101,16 @@ export default class SftpClient extends EventEmitter {
           );
         });
       }).connect(this.config);
-    }).finally(() => { this.conn.end(); });
+    }).finally(() => {  conn.end(); });
   }
 
   initFtp() {
-    this.conn = new ssh2.Client();
+    let conn = new ssh2.Client();
 
     // TODO: add listener
-    this.conn.on('error', (err) => {
+    conn.on('error', (err) => {
       this.emit('error', err);
     });
+    return conn;
   }
 }
