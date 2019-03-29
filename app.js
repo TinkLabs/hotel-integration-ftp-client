@@ -24,6 +24,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     for (let file of fileList) {
       const res = await cli.getData(file.file_name);
       let chunk_records = chunk(res, 150);
+      let i = 0;
       for (let chunk_record of chunk_records) {
         let records_message = {
           meta: {
@@ -34,6 +35,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
             last_modified: file.last_modified,
             hotel_code: chunk_record[0].reservation.hotel_code,
             hotel_id: hotelId,
+            record_seq: i++
           },
           reservations: chunk_record,
         };
