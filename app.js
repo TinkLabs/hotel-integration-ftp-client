@@ -21,10 +21,10 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log('---sorted fileList---')
     console.log(fileList);
 
-    await Promise.each(fileList, async (file) => {
+    for (let file of fileList) {
       const res = await cli.getData(file.file_name);
       let chunk_records = chunk(res, 150);
-      Promise.each(chunk_records, async (chunk_record) => {
+      for (let chunk_record of chunk_records) {
         let records_message = {
           meta: {
             chunk_id: uuid(),
@@ -37,33 +37,20 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
           },
           reservations: chunk_record,
         };
-        return socket.send(records_message);
-      }).then(()=>{
-        console.log(
-          Chalk.green(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
-          `[Send event] Hotel[${hotelId}] ${file}`,
-        );
-        return cli.deleteFile(file.file_name);
-      });
-    }).catch((err) => {
-      // Error handling
-      console.log(err);
-      console.log(
-        Chalk.red(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
-        `[File Error]Hotel[${hotelId}] ${err}`,
-      );
-    }).finally(async () => {
-      // update the db record
-      await db('integration_ftp')
-        .where('id', ftpId)
-        .update({ last_connected: db.fn.now() });
-    });
+        socket.send(records_message);
+      }
+      cli.deleteFile(file.file_name);
+    }
   } catch (err) {
     // Error handling
     console.log(
       Chalk.red(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
       `[Error] Hotel[${hotelId}] ${err}`,
     );
+  } finally {
+    await db('integration_ftp')
+      .where('id', ftpId)
+      .update({ last_connected: db.fn.now() });
   }
 }
 
@@ -71,7 +58,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
 async function run() {
   // select the ftp, file setting
   let res = await db('integration_ftp')
-    .whereRaw('NOW() > DATE_ADD(`last_connected`, INTERVAL `time_interval` MINUTE)')
+    .whereRaw('NOW() >= DATE_ADD(`last_connected`, INTERVAL `time_interval` MINUTE)')
     .leftJoin('integrations', 'integration_ftp.integration_id', 'integrations.id')
     .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config', 'integrations.token');
 
