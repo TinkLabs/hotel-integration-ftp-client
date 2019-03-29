@@ -3,10 +3,13 @@ import Chalk from 'chalk';
 import Promise from 'bluebird';
 import chunk from 'chunk';
 import uuid from 'uuid/v4';
+import {filter} from "lodash"
 
 import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
+
+const running = new Set();
 
 // Aysnc Sub-thread sript
 async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
@@ -15,45 +18,52 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     let notSorted_fileList = await cli.getDir();
     console.log('---not sorted fileList---');
     console.log(notSorted_fileList);
-    let fileList = notSorted_fileList.sort((file1, file2) => {
+
+   
+    let filter_fileList = filter(notSorted_fileList, (o) => { return !running.has(o.file_name) })
+    console.log('---filter running fileList---');
+    console.log(filter_fileList);
+
+    let fileList = filter_fileList.sort((file1, file2) => {
       return file1.last_modified - file2.last_modified;
     });
     console.log('---sorted fileList---')
     console.log(fileList);
 
+    fileList.forEach((o) => { running.add(o.file_name) })
+    console.log('---lock file---')
+    console.log(running);
+
     for (let file of fileList) {
+
       const res = await cli.getData(file.file_name);
       let chunk_records = chunk(res, 150);
-      let i = 0;
+      let i = 1;
       for (let chunk_record of chunk_records) {
 
-        let time = Number(new Date());
         await (function(){
           return new Promise((resolve) => {
             let records_message = {
               meta: {
+                id: uuid(),
                 chunk_id: uuid(),
+                chunk_seq: i++,
                 total_record: res.length,
                 num_of_records: chunk_record.length,
                 file_name: file.file_name,
                 last_modified: file.last_modified,
                 hotel_code: chunk_record[0].reservation.hotel_code,
                 hotel_id: hotelId,
-                record_seq: i++
               },
               reservations: chunk_record,
             };
             socket.send(records_message);
-
-            setTimeout(() => {
-              resolve();
-            }, 3000);
+            setTimeout(() => {resolve()}, 3000);
           })
         })()
-
-        console.log("time", Number(new Date()) - time);
       }
-      cli.deleteFile(file.file_name);
+      await cli.deleteFile(file.file_name);
+      running.delete(file.file_name)
     }
   } catch (err) {
     // Error handling
