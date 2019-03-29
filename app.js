@@ -26,20 +26,32 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       let chunk_records = chunk(res, 150);
       let i = 0;
       for (let chunk_record of chunk_records) {
-        let records_message = {
-          meta: {
-            chunk_id: uuid(),
-            total_record: res.length,
-            num_of_records: chunk_record.length,
-            file_name: file.file_name,
-            last_modified: file.last_modified,
-            hotel_code: chunk_record[0].reservation.hotel_code,
-            hotel_id: hotelId,
-            record_seq: i++
-          },
-          reservations: chunk_record,
-        };
-        socket.send(records_message);
+
+        let time = Number(new Date());
+        await (function(){
+          return new Promise((resolve) => {
+            let records_message = {
+              meta: {
+                chunk_id: uuid(),
+                total_record: res.length,
+                num_of_records: chunk_record.length,
+                file_name: file.file_name,
+                last_modified: file.last_modified,
+                hotel_code: chunk_record[0].reservation.hotel_code,
+                hotel_id: hotelId,
+                record_seq: i++
+              },
+              reservations: chunk_record,
+            };
+            socket.send(records_message);
+
+            setTimeout(() => {
+              resolve();
+            }, 3000);
+          })
+        })()
+
+        console.log("time", Number(new Date()) - time);
       }
       cli.deleteFile(file.file_name);
     }
