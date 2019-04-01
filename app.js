@@ -8,6 +8,7 @@ import {filter} from "lodash"
 import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
+import { SQS } from 'aws-sdk';
 
 const running = new Set();
 const clients = {};
@@ -35,6 +36,8 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log('---lock file---')
     console.log(running);
 
+    let sqs = new SQS({region: process.env.AWS_DEFAULT_REGION});
+
     for (let file of fileList) {
 
       const res = await cli.getData(file.file_name);
@@ -43,26 +46,23 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       let uniqueFileId = uuid()
       for (let chunk_record of chunk_records) {
 
-        await (function(){
-          return new Promise((resolve) => {
-            let records_message = {
-              meta: {
-                id: uniqueFileId,
-                chunk_id: uuid(),
-                chunk_seq: i++,
-                total_record: res.length,
-                num_of_records: chunk_record.length,
-                file_name: file.file_name,
-                last_modified: file.last_modified,
-                hotel_code: chunk_record[0].reservation.hotel_code,
-                hotel_id: hotelId,
-              },
-              reservations: chunk_record,
-            };
-            socket.send(records_message);
-            setTimeout(() => {resolve()}, 2000);
-          })
-        })()
+        let records_message = {
+          meta: {
+            id: uniqueFileId,
+            chunk_id: uuid(),
+            chunk_seq: i++,
+            total_record: res.length,
+            num_of_records: chunk_record.length,
+            file_name: file.file_name,
+            last_modified: file.last_modified,
+            hotel_code: chunk_record[0].reservation.hotel_code,
+            hotel_id: hotelId,
+          },
+          reservations: chunk_record,
+        };
+
+        await sendSQS(sqs, records_message);
+        // socket.send(records_message);
       }
       await cli.deleteFile(file.file_name);
       running.delete(file.file_name)
@@ -126,3 +126,28 @@ Cron.job('* * * * *', (() => {
   // start the service
   run();
 })).start();
+
+
+async function sendSQS(sqs, raw) {
+  
+  console.log("start send message to sqs");
+
+  let data = { event: 'RESERVATIONS', data: raw }
+
+  let params = {
+    QueueUrl:process.env.HAI_QUEUE_URL, 
+    MessageBody:JSON.stringify(data), 
+    MessageDeduplicationId: uuid(),
+    MessageGroupId: data.event,
+  }
+
+  return new Promise((resolve, reject) => {
+    sqs.sendMessage(params, function(err) {
+      if (err) {
+        reject(err);
+      }
+      resolve();
+    })
+  })
+}
+
