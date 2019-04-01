@@ -36,17 +36,18 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log(running);
 
     for (let file of fileList) {
-      
+
       const res = await cli.getData(file.file_name);
       let chunk_records = chunk(res, 150);
       let i = 1;
+      let uniqueFileId = uuid()
       for (let chunk_record of chunk_records) {
 
         await (function(){
           return new Promise((resolve) => {
             let records_message = {
               meta: {
-                id: uuid(),
+                id: uniqueFileId,
                 chunk_id: uuid(),
                 chunk_seq: i++,
                 total_record: res.length,
