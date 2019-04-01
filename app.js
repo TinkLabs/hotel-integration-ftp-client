@@ -10,6 +10,7 @@ import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
 
 const running = new Set();
+const clients = {};
 
 // Aysnc Sub-thread sript
 async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
@@ -35,7 +36,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log(running);
 
     for (let file of fileList) {
-
+      
       const res = await cli.getData(file.file_name);
       let chunk_records = chunk(res, 150);
       let i = 1;
@@ -58,7 +59,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
               reservations: chunk_record,
             };
             socket.send(records_message);
-            setTimeout(() => {resolve()}, 3000);
+            setTimeout(() => {resolve()}, 2000);
           })
         })()
       }
@@ -89,8 +90,14 @@ async function run() {
   await Promise.all(
     res.map(async (record) => {
       let token = record.token;
-       // set up socket client
-      let socket = new Socket(record.integration_id, record.system_code, token)
+      // set up socket client
+      let socket
+      if (clients[record.integration_id]) {
+        socket = clients[record.integration_id];
+      } else {
+        socket = new Socket(record.integration_id, record.system_code, token)
+        clients[record.integration_id] = socket;
+      }
       await subThread(
         record.id,
         record.hotel_id,
@@ -98,8 +105,6 @@ async function run() {
         JSON.parse(record.file_config || '{}'),
         socket,
       );
-      // close socket after subThread.
-      socket.close();
       return record;
     }),
   );
