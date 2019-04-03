@@ -11,7 +11,9 @@ export default class SftpClient extends EventEmitter {
     super();
 
     this.config = config;
-    this.remote = path.join('.', remote);
+    // this.remote = path.join('.', remote);
+    // TODO remember change back to `remote` when commit
+    this.remote = 'test/cypher_import';
     this.hotelId = hotelId;
     this.s3 = new aws.S3({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -32,11 +34,9 @@ export default class SftpClient extends EventEmitter {
         this.s3Busket = `${busketName}-dev`;
         break;
     }
-
   }
 
   async getDir() {
-
     let conn = this.initFtp();
     return new Promise((resolve, reject) => {
       // add listener to read
@@ -46,18 +46,21 @@ export default class SftpClient extends EventEmitter {
           // read remote directory
           sftp.readdir(this.remote, (err, list) => {
             if (err) reject(err);
+            console.info(JSON.stringify(list, null, 2), '\n ');
             // return array
             resolve(list);
           });
         });
         // sftp connection
-      }).connect(this.config);
+      })
+        .connect(this.config);
       // close sftp connection
-    }).finally(() => { conn.end(); });
+    }).finally(() => {
+      conn.end();
+    });
   }
 
-  async dowmloadFile(fileName, encode = 'utf8') {
-
+  async downloadFile(fileName, encode = 'utf8') {
     let conn = this.initFtp();
     return new Promise((resolve, reject) => {
       // add listener to read
@@ -76,20 +79,31 @@ export default class SftpClient extends EventEmitter {
             if (err) reject(err);
 
             // upload data to s3
-            this.s3.putObject({ Bucket: this.s3Busket, Key: storePath, Body: buff })
+            this.s3.putObject({
+              Bucket: this.s3Busket,
+              Key: storePath,
+              Body: buff,
+            })
               .promise()
-              .then(() => { resolve(buff.toString(encode).trim()); })
-              .catch((uploadErr) => { reject(uploadErr); });
+              .then(() => {
+                resolve(buff.toString(encode)
+                  .trim());
+              })
+              .catch((uploadErr) => {
+                reject(uploadErr);
+              });
           });
         });
         // sftp connection
-      }).connect(this.config);
+      })
+        .connect(this.config);
       // close sftp connection
-    }).finally(() => { conn.end(); });
+    }).finally(() => {
+      conn.end();
+    });
   }
 
   async deleteFile(fileName) {
-
     let conn = this.initFtp();
     return new Promise((resolve, reject) => {
       conn.once('ready', () => {
@@ -97,11 +111,17 @@ export default class SftpClient extends EventEmitter {
           if (connErr) reject(connErr);
           sftp.unlink(
             path.join(this.remote, fileName),
-            (err) => { if (err) reject(err); resolve(true); },
+            (err) => {
+              if (err) reject(err);
+              resolve(true);
+            },
           );
         });
-      }).connect(this.config);
-    }).finally(() => {  conn.end(); });
+      })
+        .connect(this.config);
+    }).finally(() => {
+      conn.end();
+    });
   }
 
   initFtp() {

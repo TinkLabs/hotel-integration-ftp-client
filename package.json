@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "babel-node app.js",
+    "start": "babel-node $NODE_DEBUG_OPTION app.js",
+    "test": "babel-node $NODE_DEBUG_OPTION sqlite.js",
     "start_ftp": "npm run copy_file_ftp && docker-compose up",
     "copy_file_ftp": "cp -r data/. ftp_server"
   },
@@ -30,6 +31,7 @@
     "request": "^2.88.0",
     "request-promise": "^4.2.2",
     "socket.io-client": "^2.2.0",
+    "sqlite3": "^4.0.6",
     "ssh2": "^0.8.0",
     "time-stamp": "^2.2.0",
     "uuid": "^3.3.2"

@@ -3,74 +3,111 @@ import Chalk from 'chalk';
 import Promise from 'bluebird';
 import chunk from 'chunk';
 import uuid from 'uuid/v4';
-import {filter} from "lodash"
+import { filter } from 'lodash';
 
+import { SQS } from 'aws-sdk';
 import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
-import { SQS } from 'aws-sdk';
 
 const running = new Set();
 const clients = {};
+const sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
+
+
+async function sendSQS(raw) {
+  console.log('start send message to sqs');
+
+  let data = {
+    event: 'RESERVATIONS',
+    data: raw,
+  };
+
+  let params = {
+    QueueUrl: process.env.HAI_QUEUE_URL,
+    MessageBody: JSON.stringify(data),
+    MessageDeduplicationId: uuid(),
+    MessageGroupId: data.event,
+  };
+
+  /* return new Promise((resolve, reject) => {
+    sqs.sendMessage(params, (err) => {
+      if (err) {
+        reject(err);
+      }
+      resolve();
+    });
+  });
+  */
+  sqs.sendMessage(params, function (err, response) {
+    if (err) {
+      console.log(err, err.stack);
+    } else {
+      console.log(response);
+    }
+  });
+}
 
 // Aysnc Sub-thread sript
 async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
   try {
     const cli = new System(hotelId, ftpConfig, fileConfig);
-    let notSorted_fileList = await cli.getDir();
+    let notSortedFileList = await cli.getDir();
     console.log('---not sorted fileList---');
-    console.log(notSorted_fileList);
+    console.log(notSortedFileList);
 
-   
-    let filter_fileList = filter(notSorted_fileList, (o) => { return !running.has(o.file_name) })
+    let filterFileList = filter(notSortedFileList, o => !running.has(o.file_name));
     console.log('---filter running fileList---');
-    console.log(filter_fileList);
+    console.log(filterFileList);
 
-    let fileList = filter_fileList.sort((file1, file2) => {
-      return file1.last_modified - file2.last_modified;
-    });
-    console.log('---sorted fileList---')
+    let fileList = filterFileList.sort((file1, file2) => file1.last_modified - file2.last_modified);
+    console.log('---sorted fileList---');
     console.log(fileList);
 
-    fileList.forEach((o) => { running.add(o.file_name) })
-    console.log('---lock file---')
+    fileList.forEach((o) => {
+      running.add(o.file_name);
+    });
+    console.log('---lock file---');
     console.log(running);
 
-    let sqs = new SQS({region: process.env.AWS_DEFAULT_REGION});
-
+    // let sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
     for (let file of fileList) {
-
       const res = await cli.getData(file.file_name);
-      let chunk_records = chunk(res, 150);
+      let chunkRecords = chunk(res, 150);
       let i = 1;
-      let uniqueFileId = uuid()
-      for (let chunk_record of chunk_records) {
-
-        let records_message = {
+      console.info(JSON.stringify(chunkRecords.length, null, 2), '\n ');
+      let uniqueFileId = uuid();
+      for (let chunkRecord of chunkRecords) {
+        let recordsMessage = {
           meta: {
             id: uniqueFileId,
             chunk_id: uuid(),
             chunk_seq: i++,
             total_record: res.length,
-            num_of_records: chunk_record.length,
+            num_of_records: chunkRecord.length,
             file_name: file.file_name,
             last_modified: file.last_modified,
-            hotel_code: chunk_record[0].reservation.hotel_code,
+            hotel_code: chunkRecord[0].reservation.hotel_code,
             hotel_id: hotelId,
           },
-          reservations: chunk_record,
+          reservations: chunkRecord,
         };
+        console.info('chunk_seq: ', JSON.stringify(i, null, 2), '\n ');
 
-        await sendSQS(sqs, records_message);
-        // socket.send(records_message);
+        await sendSQS(recordsMessage);
+        // socket.send(recordsMessage);
       }
-      await cli.deleteFile(file.file_name);
-      running.delete(file.file_name)
+      // TODO deleteFile when deploy or refactor to have states
+      // await cli.deleteFile(file.file_name);
+      // running.delete(file.file_name);
+      // TODO store fileId and the chunkRecords number into redis
     }
   } catch (err) {
     // Error handling
     console.log(
-      Chalk.red(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
+      Chalk.red(new Date().toISOString()
+        .replace(/T/, ' ')
+        .replace(/\..+/, ''), ':'),
       `[Error] Hotel[${hotelId}] ${err}`,
     );
   } finally {
@@ -78,6 +115,13 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       .where('id', ftpId)
       .update({ last_connected: db.fn.now() });
   }
+}
+
+/**
+ *
+ */
+function resendOrderedMsg() {
+
 }
 
 // main thread sript
@@ -88,17 +132,18 @@ async function run() {
     .leftJoin('integrations', 'integration_ftp.integration_id', 'integrations.id')
     .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config', 'integrations.token');
 
+
   await Promise.all(
     res.map(async (record) => {
-      let token = record.token;
+      let { token } = record;
       // set up socket client
-      let socket
-      if (clients[record.integration_id]) {
-        socket = clients[record.integration_id];
-      } else {
-        socket = new Socket(record.integration_id, record.system_code, token)
-        clients[record.integration_id] = socket;
-      }
+      let socket;
+      // if (clients[record.integration_id]) {
+      //   socket = clients[record.integration_id];
+      // } else {
+      //   socket = new Socket(record.integration_id, record.system_code, token);
+      //   clients[record.integration_id] = socket;
+      // }
       await subThread(
         record.id,
         record.hotel_id,
@@ -113,41 +158,25 @@ async function run() {
 
 // opening console log
 console.log(
-  Chalk.green(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
+  Chalk.green(new Date().toISOString()
+    .replace(/T/, ' ')
+    .replace(/\..+/, ''), ':'),
   '[hotel-integration ftp client start]',
 );
 
+run();
+
 // schedule job in every minute
+/*
 Cron.job('* * * * *', (() => {
   console.log(
-    Chalk.blue(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''), ':'),
+    Chalk.blue(new Date().toISOString()
+      .replace(/T/, ' ')
+      .replace(/\..+/, ''), ':'),
     'Main thread start',
   );
   // start the service
   run();
-})).start();
-
-
-async function sendSQS(sqs, raw) {
-  
-  console.log("start send message to sqs");
-
-  let data = { event: 'RESERVATIONS', data: raw }
-
-  let params = {
-    QueueUrl:process.env.HAI_QUEUE_URL, 
-    MessageBody:JSON.stringify(data), 
-    MessageDeduplicationId: uuid(),
-    MessageGroupId: data.event,
-  }
-
-  return new Promise((resolve, reject) => {
-    sqs.sendMessage(params, function(err) {
-      if (err) {
-        reject(err);
-      }
-      resolve();
-    })
-  })
-}
-
+}))
+  .start();
+*/

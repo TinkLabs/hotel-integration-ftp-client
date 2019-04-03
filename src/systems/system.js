@@ -17,19 +17,22 @@ export default class System extends EventEmitter {
   }
 
   async getDir() {
-    return this.ftp.getDir().map((data) => {
-      return {
+    return this.ftp.getDir()
+      .map(data => ({
         file_name: data.filename,
         last_modified: data.attrs.mtime,
-      }
-    });
+      }));
   }
 
   async getData(fileName) {
     const setting = this.fileConfig;
 
     // get remote data
-    let raw = await this.ftp.dowmloadFile(fileName);
+    if (!fileName.endsWith('.txt')) {
+      console.log(` fileName with ${fileName} is not need to read`);
+      return;
+    }
+    let raw = await this.ftp.downloadFile(fileName);
 
     return parser(
       raw,
@@ -44,6 +47,7 @@ export default class System extends EventEmitter {
   }
 
   initFtp() {
+
     this.ftp = new SftpClient(
       this.hotelId,
       {
@@ -51,6 +55,7 @@ export default class System extends EventEmitter {
         user: this.ftpConfig.user,
         password: this.ftpConfig.password,
         port: this.ftpConfig.port,
+        readyTimeout: 600000,
       },
       this.ftpConfig.remote,
     );

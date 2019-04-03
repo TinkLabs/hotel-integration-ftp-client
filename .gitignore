@@ -9,3 +9,5 @@ hig-ftp-client.env
 /upload/sample-data.txt
 /upload
 /download
+
+.idea/
