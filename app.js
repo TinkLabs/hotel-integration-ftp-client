@@ -9,6 +9,7 @@ import { SQS } from 'aws-sdk';
 import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
+import { sqlite, insertFileMessage, selectFileMessageByUuid } from './src/database/sqlite';
 
 const running = new Set();
 const clients = {};
@@ -30,21 +31,13 @@ async function sendSQS(raw) {
     MessageGroupId: data.event,
   };
 
-  /* return new Promise((resolve, reject) => {
-    sqs.sendMessage(params, (err) => {
+  return new Promise((resolve, reject) => {
+    sqs.sendMessage(params, (err, response) => {
       if (err) {
         reject(err);
       }
-      resolve();
+      resolve(response);
     });
-  });
-  */
-  sqs.sendMessage(params, function (err, response) {
-    if (err) {
-      console.log(err, err.stack);
-    } else {
-      console.log(response);
-    }
   });
 }
 
@@ -75,8 +68,9 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       const res = await cli.getData(file.file_name);
       let chunkRecords = chunk(res, 150);
       let i = 1;
-      console.info(JSON.stringify(chunkRecords.length, null, 2), '\n ');
       let uniqueFileId = uuid();
+      insertFileMessage(uniqueFileId, chunkRecords.length);
+
       for (let chunkRecord of chunkRecords) {
         let recordsMessage = {
           meta: {
@@ -94,7 +88,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
         };
         console.info('chunk_seq: ', JSON.stringify(i, null, 2), '\n ');
 
-        await sendSQS(recordsMessage);
+        let response = await sendSQS(recordsMessage);
         // socket.send(recordsMessage);
       }
       // TODO deleteFile when deploy or refactor to have states
