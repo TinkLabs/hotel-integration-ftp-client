@@ -20,6 +20,7 @@ const running = new Set();
 const clients = {};
 const sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
 
+process.env.runtimePath = path.join(__dirname, "runtime")
 
 async function sendSQS(raw) {
   console.log('start send message to hig_ftp_queue_staging.fifo sqs');
@@ -71,6 +72,24 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
 
     // let sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
     for (let file of fileList) {
+      await cli.getDataByChunk(file.file_name, 150, async (chunkRecord, chunkSeq, totelRecordCnt, totelChunkCnt) => {
+        let recordsMessage = {
+          meta: {
+            chunk_id: uuid(),
+            chunk_seq: chunkSeq,
+            total_record: totelRecordCnt,
+            num_of_records: chunkRecord.length,
+            file_name: file.file_name,
+            last_modified: file.last_modified,
+            hotel_code: chunkRecord[0].reservation.hotel_code,
+            hotel_id: hotelId,
+          },
+          reservations: chunkRecord,
+        };
+        //await sendSQS(recordsMessage);
+        console.log("emit message:", "totel:", chunkRecord.length, "first reservation:",recordsMessage.reservations[0].reservation.reservation_id, "last reservation:", recordsMessage.reservations[chunkRecord.length - 1].reservation.reservation_id , "meta:", JSON.stringify(recordsMessage.meta))
+      });
+
       const res = await cli.getData(file.file_name);
       let chunkRecords = chunk(res, 150);
       let i = 1;
