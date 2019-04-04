@@ -70,13 +70,15 @@ export default class SftpClient extends EventEmitter {
           // destination path
           const remotePath = path.join(this.remote, fileName);
           const storePath = path.join(
-            this.hotelId !== 'string' ? this.hotelId.toString() : this.hotelId,
+            this.hotelId !== 'string' ? this.hotelId.toString() : this.hotelId, `${timestamp.utc('YYYYMMDD')}`,
             `${timestamp.utc('YYYYMMDDHHmmss')}_${fileName}`,
           );
 
           // download file
           sftp.readFile(remotePath, encode, (err, buff) => {
-            if (err) reject(err);
+            if (err) {
+              reject(err);
+            }
 
             // upload data to s3
             this.s3.putObject({
@@ -86,10 +88,12 @@ export default class SftpClient extends EventEmitter {
             })
               .promise()
               .then(() => {
+                console.info(JSON.stringify('start upload to s3', null, 2), '\n ');
                 resolve(buff.toString(encode)
                   .trim());
               })
               .catch((uploadErr) => {
+                console.info(JSON.stringify('upload to s3 error', null, 2), '\n ');
                 reject(uploadErr);
               });
           });

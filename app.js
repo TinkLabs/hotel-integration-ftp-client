@@ -4,12 +4,17 @@ import Promise from 'bluebird';
 import chunk from 'chunk';
 import uuid from 'uuid/v4';
 import { filter } from 'lodash';
+import path from 'path';
 
 import { SQS } from 'aws-sdk';
 import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
-import { sqlite, insertFileMessage, selectFileMessageByUuid } from './src/database/sqlite';
+import {
+  insertFileMessage,
+  insertFileChunk,
+  selectFileChunkSizeByUuid
+} from './src/database/sqlite';
 
 const running = new Set();
 const clients = {};
@@ -17,22 +22,23 @@ const sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
 
 
 async function sendSQS(raw) {
-  console.log('start send message to sqs');
+  console.log('start send message to hig_ftp_queue_staging.fifo sqs');
 
   let data = {
     event: 'RESERVATIONS',
     data: raw,
   };
 
-  let params = {
-    QueueUrl: process.env.HAI_QUEUE_URL,
+  let ftpParams = {
+    QueueUrl: process.env.HAI_FTP_URL,
     MessageBody: JSON.stringify(data),
     MessageDeduplicationId: uuid(),
     MessageGroupId: data.event,
   };
 
+
   return new Promise((resolve, reject) => {
-    sqs.sendMessage(params, (err, response) => {
+    sqs.sendMessage(ftpParams, (err, response) => {
       if (err) {
         reject(err);
       }
@@ -76,7 +82,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
           meta: {
             id: uniqueFileId,
             chunk_id: uuid(),
-            chunk_seq: i++,
+            chunk_seq: i,
             total_record: res.length,
             num_of_records: chunkRecord.length,
             file_name: file.file_name,
@@ -86,11 +92,17 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
           },
           reservations: chunkRecord,
         };
-        console.info('chunk_seq: ', JSON.stringify(i, null, 2), '\n ');
+        console.info('chunk_seq: ', JSON.stringify(i - 1, null, 2), '\n ');
 
-        let response = await sendSQS(recordsMessage);
+        await sendSQS(recordsMessage);
+        await insertFileChunk(
+          uniqueFileId, i - 1, JSON.stringify(recordsMessage),
+        );
+        i += 1;
         // socket.send(recordsMessage);
       }
+      let chunkSize = await selectFileChunkSizeByUuid(uniqueFileId);
+      console.info('chunkSize: ', JSON.stringify(chunkSize, null, 2), '\n ');
       // TODO deleteFile when deploy or refactor to have states
       // await cli.deleteFile(file.file_name);
       // running.delete(file.file_name);
@@ -109,13 +121,6 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       .where('id', ftpId)
       .update({ last_connected: db.fn.now() });
   }
-}
-
-/**
- *
- */
-function resendOrderedMsg() {
-
 }
 
 // main thread sript

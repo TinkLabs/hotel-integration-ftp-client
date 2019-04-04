@@ -1,4 +1,5 @@
 /* eslint-disable import/prefer-default-export */
+import readline from 'readline'
 import _ from 'lodash';
 import mapObj from 'map-obj';
 import dotProp from 'dot-prop';
@@ -12,14 +13,9 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
   records = _.drop(records, header);
   records = _.dropRight(records, footer);
 
-  console.log(records.length);
-  let count = 0;
-  return records.map(record => {
-    console.log(`handling record : ${count++}`);
+  return records.map((record) => {
     record = record.split(fdSplit);
-    record = mapObj(fieldMapping, (key, value) => {
-      return [key, !empty(record[value.column_index]) ? record[value.column_index] : !empty(value.default) ? value.default : null];
-    });
+    record = mapObj(fieldMapping, (key, value) => [key, !empty(record[value.column_index]) ? record[value.column_index] : !empty(value.default) ? value.default : null]);
 
     let checkin_datetime;
     if (!empty(record.checkin_datetime)) {
@@ -46,8 +42,8 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         hotel_code: !empty(record.hotel_code) ? record.hotel_code : '',
         reservation_id: !empty(record.reservation_id) ? record.reservation_id : '',
         reservation_status: !empty(record.reservation_status) ? record.reservation_status : '',
-        checkin_datetime: checkin_datetime,
-        checkout_datetime: checkout_datetime,
+        checkin_datetime,
+        checkout_datetime,
         actual_checkin_date: !empty(record.actual_checkin_date) ? moment(record.actual_checkin_date, 'DD-MMM-YY')
           .format('YYYY-MM-DD') : '',
         actual_checkout_date: !empty(record.actual_checkout_date) ? moment(record.actual_checkout_date, 'DD-MMM-YY')
@@ -57,8 +53,8 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         cancel_date: !empty(record.cancel_date) ? moment(record.cancel_date, 'DD-MMM-YY')
           .format('YYYY-MM-DD') : '',
         cancel_id: !empty(record.cancel_id) ? record.cancel_id : '',
-        num_adults: !empty(record.num_adults) ? parseInt(record.num_adults) : 0,
-        num_children: !empty(record.num_children) ? parseInt(record.num_children) : 0,
+        num_adults: !empty(record.num_adults) ? parseInt(record.num_adults, 10) : 0,
+        num_children: !empty(record.num_children) ? parseInt(record.num_children, 10) : 0,
         accompanying: !empty(record.accompanying) ? record.accompanying : '',
         room_number: !empty(record.room_number) ? record.room_number : '',
         room_type: !empty(record.room_type) ? record.room_type : '',
@@ -106,11 +102,13 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
       renvenue: {
         currency: !empty(record.currency) ? record.currency : '',
         room_rate_amount: !empty(record.room_rate_amount) ? parseFloat(record.room_rate_amount) : 0,
-        food_berverages_amount: !empty(record.food_berverages_amount) ? parseFloat(record.food_berverages_amount) : 0,
-        total_room_revenue: !empty(record.total_room_revenue) ? parseFloat(record.total_room_revenue) : 0,
+        food_berverages_amount:
+          !empty(record.food_berverages_amount) ? parseFloat(record.food_berverages_amount) : 0,
+        total_room_revenue:
+          !empty(record.total_room_revenue) ? parseFloat(record.total_room_revenue) : 0,
         room_revenue: !empty(record.room_revenue) ? parseFloat(record.room_revenue) : 0,
         total_price_tax: !empty(record.total_price_tax) ? parseFloat(record.total_price_tax) : 0,
-      }
+      },
     };
     return result;
   });
