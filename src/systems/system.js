@@ -1,10 +1,28 @@
 import EventEmitter from 'events';
 import Chalk from 'chalk';
+import LineByLine from 'n-readlines';
+import fs from 'fs';
+import SftpClient from '../services/ftp/sftpClient';
 import { parser } from './helpers';
-import SftpClient from '../services/ftp/sftpClient'
-import nReadLines from 'n-readlines'
-import readline from "readline"
-import fs from "fs"
+
+async function fileLineTotal(fileName, newLineCharacter) {
+  const lf = newLineCharacter.charCodeAt(0);
+  return new Promise((resolve, reject) => {
+    try {
+      let i;
+      let count = 0;
+      fs.createReadStream(fileName)
+        .on('data', (chunk) => {
+          for (i = 0; i < chunk.length; i += 1) if (chunk[i] === lf) count += 1;
+        })
+        .on('end', () => {
+          resolve(count);
+        });
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
 
 export default class System extends EventEmitter {
   constructor(hotelId, ftpConfig, fileConfig) {
@@ -27,74 +45,72 @@ export default class System extends EventEmitter {
       }));
   }
 
-  async getData(fileName) {
+  async getFileChunkInfo(fileName, chunkSize) {
     const setting = this.fileConfig;
-
-    // get remote data
-    if (!fileName.endsWith('.txt')) {
-      console.log(` fileName with ${fileName} is not need to read`);
-      return;
-    }
-    let raw = await this.ftp.downloadFile(fileName);
-
-    return parser(
-      raw,
-      setting.ignoredTop, setting.ignoredBot,
-      setting.recordSplit, setting.fieldSplit,
-      setting.dataSchema,
-    );
-  }
-
-  async getDataByChunk(fileName, chunkSize, cb) {
-    const setting = this.fileConfig;
-
-    // get remote data
-    if (!fileName.endsWith('.txt')) {
-      console.log(` fileName with ${fileName} is not need to read`);
-      return;
-    }
-
     let localFile = await this.ftp.downloadFile(fileName);
 
-    let totelLine = await fileLineTotel(localFile, setting.recordSplit)
-    let totelRecordCnt = totelLine - setting.ignoredTop - setting.ignoredBot
-    let totelChunkCnt = Math.ceil(totelRecordCnt / chunkSize);
+    let totalLine = await fileLineTotal(localFile, setting.recordSplit);
+    let totalRecordCount = totalLine - setting.ignoredTop - setting.ignoredBot;
+    let totalChunkCount = Math.ceil(totalRecordCount / chunkSize);
 
-    let rl = new nReadLines(localFile, {newLineCharacter:setting.recordSplit});
-    let line, buf = "";
-    let i = 0, readedCnt = 0, chunkSeq = 0, lineNum = 0;
+    return {
+      fileName,
+      localFile,
+      totalLine,
+      totalRecordCount,
+      totalChunkCount,
+      chunkSize,
+    };
+  }
 
-    console.log("chunk file:", localFile, "totelLine:", totelLine, "totelRecordCnt:", totelRecordCnt)
+  async chunkFile(chunkInfo, cb) {
+    const setting = this.fileConfig;
+
+    let {
+      localFile, totalLine, totalRecordCount, totalChunkCount, chunkSize,
+    } = chunkInfo;
+
+    let rl = new LineByLine(localFile, { newLineCharacter: setting.recordSplit });
+    let line;
+    let buf = '';
+    let i = 0;
+    let readCount = 0;
+    let chunkSeq = 0;
+    let lineNum = 0;
+
+    console.log('chunk file:', localFile, 'totalLine:', totalLine, 'totalRecordCount:', totalRecordCount);
+
+    // eslint-disable-next-line no-cond-assign
     while (line = rl.next()) {
+      lineNum += 1;
+      if (!(lineNum <= setting.ignoredTop || lineNum > totalLine - setting.ignoredBot)) {
+        // console.log(i);
+        buf += (buf === '' ? line : setting.recordSplit + line);
+        i += 1;
+        readCount += 1;
 
-      lineNum++;
-      if (lineNum <= setting.ignoredTop || lineNum > totelLine - setting.ignoredBot) {
-        continue;
+        if (i >= chunkSize || readCount === totalRecordCount) {
+          chunkSeq += 1;
+          let raw = buf;
+          buf = '';
+          i = 0;
+
+          let chunkRecord = parser(
+            raw,
+            0, // top already ingored.
+            0, // bot already ingored too.
+            setting.recordSplit, setting.fieldSplit,
+            setting.dataSchema,
+          );
+
+          console.log('parser chunk:', chunkSeq, 'last record:', readCount, 'totalChunkCount:', totalChunkCount);
+          // eslint-disable-next-line no-await-in-loop
+          await cb(chunkRecord, chunkSeq, totalRecordCount, totalChunkCount);
+        }
       }
-
-      // console.log(i);
-      buf += (buf == "" ? line : setting.recordSplit + line );
-      i++; readedCnt++;
-
-      if (i >= chunkSize || readedCnt == totelRecordCnt) {
-        chunkSeq++;
-        let raw = buf; buf = ""; i = 0;
-
-        let chunkRecord = parser(
-          raw,
-          0, // top already ingored.
-          0, // bot already ingored too.
-          setting.recordSplit, setting.fieldSplit,
-          setting.dataSchema,
-        );
-
-        console.log("parser chunk:", chunkSeq, "last record:", readedCnt, "totelChunkCnt:", totelChunkCnt);
-        await cb(chunkRecord, chunkSeq, totelRecordCnt, totelChunkCnt)
-      }
+      fs.unlinkSync(localFile);
+      console.log('unlink localFile', localFile);
     }
-
-    fs.unlinkSync(localFile);
-    console.log("unlink localFile", localFile)
   }
 
   async deleteFile(fileName) {
@@ -102,7 +118,6 @@ export default class System extends EventEmitter {
   }
 
   initFtp() {
-
     this.ftp = new SftpClient(
       this.hotelId,
       {
@@ -124,31 +139,4 @@ export default class System extends EventEmitter {
       console.log(Chalk.red(new Date().toISOString(), ':'), `[FTP Error] Hotel[${this.hotelId}] `, JSON.stringify(err));
     });
   }
-}
-
-async function fileLineTotel2(fileName) {
-  return new Promise((resolve, reject) => {
-      let i = 0;
-      let rl = readline.createInterface({input: fs.createReadStream(fileName)})
-      
-      rl.on("error", (err)=> {reject(err);})
-      rl.on("line", ()=>{i++;})
-      rl.on("close", () => {resolve(i);})
-  })
-}
-
-async function fileLineTotel(fileName, newLineCharacter) {
-  const lf = newLineCharacter.charCodeAt(0);
-  return new Promise((resolve, reject) => {
-      var i;
-      var count = 0;
-      fs.createReadStream(fileName)
-      .on('data', function(chunk) {
-          for (i=0; i < chunk.length; ++i)
-          if (chunk[i] == lf) count++;
-      })
-      .on('end', function() {
-          resolve(count);
-      });
-  })
 }

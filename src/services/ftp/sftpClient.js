@@ -5,18 +5,18 @@ import Promise from 'bluebird';
 import path from 'path';
 import aws from 'aws-sdk';
 import timestamp from 'time-stamp';
-import fs from "fs";
+import fs from 'fs';
 
-const S3_TAGGING = "source=ftp-client"
+const S3_TAGGING = 'source=ftp-client';
 
 export default class SftpClient extends EventEmitter {
   constructor(hotelId, config, remote) {
     super();
 
     this.config = config;
-    // this.remote = path.join('.', remote);
+    this.remote = path.join('.', remote);
     // TODO remember change back to `remote` when commit
-    this.remote = 'test/cypher_import';
+    // this.remote = 'test/cypher_import';
     this.hotelId = hotelId;
     this.s3 = new aws.S3({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -55,12 +55,11 @@ export default class SftpClient extends EventEmitter {
           });
         });
         // sftp connection
-      })
-      .connect(this.config);
+      }).connect(this.config);
       // close sftp connection
     }).finally(() => {
-       conn.end(); 
-      });
+      conn.end();
+    });
   }
 
   async downloadFile(fileName, encode = 'utf8') {
@@ -82,13 +81,18 @@ export default class SftpClient extends EventEmitter {
           sftp.fastGet(remotePath, localPath, (err) => {
             if (err) reject(err);
 
-            let stream = fs.createReadStream(localPath, {encoding:encode});
+            let stream = fs.createReadStream(localPath, { encoding: encode });
             // upload data to s3
-            let s3Conf = { Bucket: this.s3Busket, Key: storePath, Body: stream, Tagging:S3_TAGGING }
+            let s3Conf = {
+              Bucket: this.s3Busket,
+              Key: storePath,
+              Body: stream,
+              Tagging: S3_TAGGING,
+            };
             this.s3.putObject(s3Conf)
               .promise()
-              .then(() => { 
-                this.deleteFile(fileName); 
+              .then(() => {
+                this.deleteFile(fileName);
                 resolve(localPath);
               })
               .catch((uploadErr) => { reject(uploadErr); });
@@ -96,10 +100,10 @@ export default class SftpClient extends EventEmitter {
         });
         // sftp connection
       })
-      .connect(this.config);
+        .connect(this.config);
       // close sftp connection
-    }).finally(() => { 
-      conn.end(); 
+    }).finally(() => {
+      conn.end();
     });
   }
 
@@ -111,17 +115,17 @@ export default class SftpClient extends EventEmitter {
           if (connErr) reject(connErr);
           sftp.unlink(
             path.join(this.remote, fileName),
-            (err) => { 
-              if (err) reject(err); 
-              resolve(true); 
+            (err) => {
+              if (err) reject(err);
+              resolve(true);
             },
           );
         });
       })
-      .connect(this.config);
-    }).finally(() => {  
+        .connect(this.config);
+    }).finally(() => {
       conn.end();
-     });
+    });
   }
 
   initFtp() {
