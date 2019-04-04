@@ -5,9 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "babel-node $NODE_DEBUG_OPTION app.js",
-    "order-handler": "babel-node $NODE_DEBUG_OPTION src/systems/order-handler.js",
-    "test": "babel-node $NODE_DEBUG_OPTION test/sqlite_test.js",
-    "test-for-await": "babel-node $NODE_DEBUG_OPTION test/for_await_test.js",
+    "order-handler": "babel-node $NODE_DEBUG_OPTION test/order_handler_test.js",
+    "test-sqlite": "babel-node $NODE_DEBUG_OPTION test/sqlite_test.js",
     "start_ftp": "npm run copy_file_ftp && docker-compose up",
     "copy_file_ftp": "cp -r data/. ftp_server"
   },

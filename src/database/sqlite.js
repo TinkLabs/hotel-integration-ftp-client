@@ -1,10 +1,14 @@
 import Promise from 'bluebird';
 import path from 'path';
+import dotenv from 'dotenv';
+
+// load the .env file
+dotenv.load();
 
 let sqlite3 = require('sqlite3')
   .verbose();
 
-const sqlite = new sqlite3.Database(path.join(__dirname, './ftp-client-sql'), sqlite3.OPEN_READWRITE);
+const sqlite = new sqlite3.Database(path.join(__dirname, './ftp-client-sql'));
 const STATUS = {
   WAIT_FOR_SEND: 'wait_for_send',
   SEND_FINISH: 'send_finish',
@@ -25,7 +29,7 @@ sqlite.serialize(() => {
  */
 function insertFileMessage(uniqueFileId, chunkRecordsLength) {
   return new Promise((resolve, reject) => {
-    sqlite.run('INSERT INTO file_msg(file_id,chunk_num,status) VALUES(?,?)',
+    sqlite.run('INSERT INTO file_msg(file_id,chunk_num,status) VALUES(?,?,?)',
       [uniqueFileId, chunkRecordsLength, STATUS.WAIT_FOR_SEND], (err) => {
         if (err) {
           reject(err);
@@ -87,9 +91,9 @@ async function selectFileChunkSizeByUuid(fileId) {
   });
 }
 
-async function selectFileChunkByUuidOrderBySequence(fileId) {
+async function selectFileChunkByFileIdOrderBySequence(fileId) {
   return new Promise((resolve, reject) => {
-    sqlite.all('SELECT file_id,sequence_num FROM file_chunk where file_id =? order by sequence_num', [fileId], (err, row) => {
+    sqlite.all('SELECT file_id,sequence_num,msg FROM file_chunk where file_id =? and status =? order by sequence_num', [fileId, STATUS.WAIT_FOR_SEND], (err, row) => {
       if (err) {
         reject(err);
       }
@@ -98,15 +102,47 @@ async function selectFileChunkByUuidOrderBySequence(fileId) {
   });
 }
 
-async function deleteDataByFileId(fileId) {
+
+/**
+ *
+ * @param fileId
+ * @param status this.STATUS.[status]
+ * @returns {Promise<Bluebird | Bluebird<any>>}
+ */
+async function updateFileMsgByFileId(fileId, status) {
   return new Promise((resolve, reject) => {
-    sqlite.run('DELETE FROM file_msg where file_id =?', [fileId], (err) => {
+    sqlite.run('UPDATE file_msg SET status=? where file_id =?', [status, fileId], (err) => {
       if (err) {
         console.info(JSON.stringify(`delete from file_msg with FileId=${fileId} failed`, null, 2), '\n ');
         reject(err);
       }
+      resolve();
     });
+  });
+}
 
+/**
+ *
+ * @param fileId
+ * @param sequenceNum
+ * @param status this.STATUS.[status]
+ * @returns {Promise<Bluebird | Bluebird<any>>}
+ */
+async function updateChunkByFileIdAndSequenceNum(fileId, sequenceNum, status) {
+  return new Promise((resolve, reject) => {
+    sqlite.run('UPDATE file_chunk SET status=? where file_id =? and sequence_num=?', [status, fileId, sequenceNum], (err) => {
+      if (err) {
+        console.info(JSON.stringify(`delete from file_chunk with FileId=${fileId} failed`, null, 2), '\n ');
+        reject(err);
+      }
+      resolve();
+    });
+  });
+}
+
+
+async function deleteChunkByFileId(fileId) {
+  return new Promise((resolve, reject) => {
     sqlite.run('DELETE FROM file_chunk where file_id =?', [fileId], (err) => {
       if (err) {
         console.info(JSON.stringify(`delete from file_chunk with FileId=${fileId} failed`, null, 2), '\n ');
@@ -118,10 +154,13 @@ async function deleteDataByFileId(fileId) {
 
 export {
   sqlite,
+  STATUS,
   insertFileMessage,
   insertFileChunk,
   selectFileMessageByUuid,
   selectFileChunkSizeByUuid,
-  deleteDataByFileId,
-  selectFileChunkByUuidOrderBySequence,
+  selectFileChunkByFileIdOrderBySequence,
+  updateFileMsgByFileId,
+  updateChunkByFileIdAndSequenceNum,
+  deleteChunkByFileId,
 };
