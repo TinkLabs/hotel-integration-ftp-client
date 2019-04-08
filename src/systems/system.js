@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import Chalk from 'chalk';
-import LineByLine from 'n-readlines';
 import fs from 'fs';
+import LineByLine from './LineByLine';
 import SftpClient from '../services/ftp/sftpClient';
 import { parser } from './helpers';
 
