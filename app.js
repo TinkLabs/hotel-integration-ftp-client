@@ -83,11 +83,11 @@ async function sendOneFile(cli, file, hotelId, socket) {
         await insertFileChunk(
           uniqueFileId, chunkSeq - 1, JSON.stringify(recordsMessage),
         );
-        // await socket.send(recordsMessage);
-        console.log('emit message:', 'total:', chunkRecord.length,
+        console.log('[ emit message] ', 'total:', chunkRecord.length,
           'first reservation:', recordsMessage.reservations[0].reservation.reservation_id,
           'last reservation:', recordsMessage.reservations[chunkRecord.length - 1].reservation.reservation_id,
           'meta:', JSON.stringify(recordsMessage.meta));
+        await socket.send(recordsMessage);
       });
 
     await sendToFtpQue(uniqueFileId);
@@ -156,12 +156,12 @@ async function run() {
       let { token } = record;
       // set up socket client
       let socket;
-      // if (clients[record.integration_id]) {
-      //   socket = clients[record.integration_id];
-      // } else {
-      //   socket = new Socket(record.integration_id, record.system_code, token);
-      //   clients[record.integration_id] = socket;
-      // }
+      if (clients[record.integration_id]) {
+        socket = clients[record.integration_id];
+      } else {
+        socket = new Socket(record.integration_id, record.system_code, token);
+        clients[record.integration_id] = socket;
+      }
       await subThread(
         record.id,
         record.hotel_id,

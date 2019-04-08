@@ -14,9 +14,9 @@ export default class SftpClient extends EventEmitter {
     super();
 
     this.config = config;
-    // this.remote = path.join('.', remote);
     // TODO remember change back to `remote` when commit
-    this.remote = 'test/cypher_import';
+    this.remote = path.join('.', remote);
+    // this.remote = 'test/cypher_import';
     this.hotelId = hotelId;
     this.s3 = new aws.S3({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -24,17 +24,17 @@ export default class SftpClient extends EventEmitter {
       region: process.env.AWS_DEFAULT_REGION,
     });
 
-    const busketName = 'hig2-ftp-data';
+    const bucketName = 'hig2-ftp-data';
     switch (process.env.ENV_STAGE.toLowerCase()) {
       case 'prod':
-        this.s3Busket = busketName;
+        this.s3Busket = bucketName;
         break;
       case 'stg':
-        this.s3Busket = `${busketName}-staging`;
+        this.s3Busket = `${bucketName}-staging`;
         break;
       case 'dev':
       default:
-        this.s3Busket = `${busketName}-dev`;
+        this.s3Busket = `${bucketName}-dev`;
         break;
     }
   }
@@ -130,7 +130,6 @@ export default class SftpClient extends EventEmitter {
 
   initFtp() {
     let conn = new ssh2.Client();
-
     // TODO: add listener
     conn.on('error', (err) => {
       this.emit('error', err);

@@ -84,12 +84,11 @@ export default class System extends EventEmitter {
     while (line = rl.next()) {
       lineNum += 1;
       if (lineNum > setting.ignoredTop && lineNum <= totalLine - setting.ignoredBot) {
-        console.info('[chunkLine]', JSON.stringify(i, null, 2), '\n ');
         buf += (buf === '' ? line : setting.recordSplit + line);
         i += 1;
         readCount += 1;
 
-        if (i >= chunkSize || readCount == totalRecordCount) {
+        if (i >= chunkSize || readCount === totalRecordCount) {
           chunkSeq += 1;
           let raw = buf;
           buf = '';

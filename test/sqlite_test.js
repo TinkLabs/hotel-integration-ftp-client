@@ -4,7 +4,7 @@ import {
   insertFileChunk,
   selectFileMessageByUuid,
   selectFileChunkSizeByUuid,
-  deleteDataByFileId,
+  updateFileMsgStatusByFileId,
   selectFileChunkByUuidOrderBySequence,
 } from '../src/database/sqlite';
 import timestamp from 'time-stamp';
