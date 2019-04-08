@@ -14,9 +14,9 @@ export default class SftpClient extends EventEmitter {
     super();
 
     this.config = config;
-    this.remote = path.join('.', remote);
+    // this.remote = path.join('.', remote);
     // TODO remember change back to `remote` when commit
-    // this.remote = 'test/cypher_import';
+    this.remote = 'test/cypher_import';
     this.hotelId = hotelId;
     this.s3 = new aws.S3({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,

@@ -32,12 +32,12 @@ export default class SocketClient extends EventEmitter {
     // add listener
     this.socket.on('connect', () => {
       this.emit('connect');
-      console.log("connect")
+      console.log('connect');
     });
 
     this.socket.on('disconnect', () => {
       this.emit('disconnect');
-      console.log("disconnect")
+      console.log('disconnect');
     });
 
     this.socket.on('error', (error) => {

@@ -83,13 +83,13 @@ export default class System extends EventEmitter {
     // eslint-disable-next-line no-cond-assign
     while (line = rl.next()) {
       lineNum += 1;
-      if (!(lineNum <= setting.ignoredTop || lineNum > totalLine - setting.ignoredBot)) {
-        // console.log(i);
+      if (lineNum > setting.ignoredTop && lineNum <= totalLine - setting.ignoredBot) {
+        console.info('[chunkLine]', JSON.stringify(i, null, 2), '\n ');
         buf += (buf === '' ? line : setting.recordSplit + line);
         i += 1;
         readCount += 1;
 
-        if (i >= chunkSize || readCount === totalRecordCount) {
+        if (i >= chunkSize || readCount == totalRecordCount) {
           chunkSeq += 1;
           let raw = buf;
           buf = '';
@@ -105,12 +105,13 @@ export default class System extends EventEmitter {
 
           console.log('parser chunk:', chunkSeq, 'last record:', readCount, 'totalChunkCount:', totalChunkCount);
           // eslint-disable-next-line no-await-in-loop
-          await cb(chunkRecord, chunkSeq, totalRecordCount, totalChunkCount);
+          // chunkRecord, chunkSeq, totalRecordCount
+          await cb(chunkRecord, chunkSeq, totalRecordCount);
         }
       }
-      fs.unlinkSync(localFile);
-      console.log('unlink localFile', localFile);
     }
+    fs.unlinkSync(localFile);
+    console.log('unlink localFile', localFile);
   }
 
   async deleteFile(fileName) {

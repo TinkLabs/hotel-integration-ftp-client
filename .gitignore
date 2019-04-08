@@ -10,5 +10,6 @@ hig-ftp-client.env
 /upload
 /download
 
+ftp-client-sql
 .idea/
 data/osr_landscape1907577.txt

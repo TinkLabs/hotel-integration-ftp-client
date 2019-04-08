@@ -27,7 +27,7 @@ process.env.runtimePath = path.join(__dirname, 'runtime');
  * @returns {Promise<Bluebird | Bluebird<any>>}
  */
 async function sendToFtpQue(raw) {
-  console.log('start send message to hig_ftp_queue_staging.fifo sqs');
+  console.log('[start send message to hig_ftp_queue_staging.fifo sqs]');
 
   let data = {
     event: 'RESERVATIONS',
@@ -51,11 +51,11 @@ async function sendToFtpQue(raw) {
   });
 }
 
-async function sendOneFile(cli, file, hotelId) {
+async function sendOneFile(cli, file, hotelId, socket) {
   let uniqueFileId = uuid();
   let fileMessage = await selectFileMessageByUuid(uniqueFileId);
   if (fileMessage !== undefined && fileMessage.file_id === uniqueFileId) {
-    console.info(JSON.stringify(`handling file with id: ${uniqueFileId}`, null, 2), '\n ');
+    console.info(JSON.stringify(`already handling file with id: ${uniqueFileId}`, null, 2), '\n ');
     return;
   }
   let chunkInfo = await cli.getFileChunkInfo(file.file_name, 150);
@@ -78,13 +78,13 @@ async function sendOneFile(cli, file, hotelId) {
           },
           reservations: chunkRecord,
         };
-        console.info('file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(i - 1, null, 2), '\n ');
+        console.info('[send one file with insert chunk]', 'file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(chunkSeq - 1, null, 2), '\n ');
 
         await insertFileChunk(
           uniqueFileId, chunkSeq - 1, JSON.stringify(recordsMessage),
         );
-        await sendToFtpQue(recordsMessage);
-        console.log('emit message:', 'totel:', chunkRecord.length,
+        // await socket.send(recordsMessage);
+        console.log('emit message:', 'total:', chunkRecord.length,
           'first reservation:', recordsMessage.reservations[0].reservation.reservation_id,
           'last reservation:', recordsMessage.reservations[chunkRecord.length - 1].reservation.reservation_id,
           'meta:', JSON.stringify(recordsMessage.meta));
@@ -94,13 +94,14 @@ async function sendOneFile(cli, file, hotelId) {
 
     running.delete(file.file_name);
   } catch (e) {
+    console.log('[send one file occur error:]', e.message, e.stack);
     await deleteChunkByFileId(uniqueFileId);
     throw e;
   }
 }
 
-// Aysnc Sub-thread sript
-async function subThread(ftpId, hotelId, ftpConfig, fileConfig /* socket */) {
+// Async Sub-thread script
+async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
   try {
     const cli = new System(hotelId, ftpConfig, fileConfig);
     let notSortedFileList = await cli.getDir();
@@ -125,7 +126,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig /* socket */) {
     // eslint-disable-next-line no-restricted-syntax
     for (let file of fileList) {
       // eslint-disable-next-line no-await-in-loop
-      await sendOneFile(cli, file, hotelId);
+      await sendOneFile(cli, file, hotelId, socket);
     }
   } catch (err) {
     // Error handling
@@ -142,7 +143,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig /* socket */) {
   }
 }
 
-// main thread sript
+// main thread script
 async function run() {
   // select the ftp, file setting
   let res = await db('integration_ftp')
@@ -155,12 +156,12 @@ async function run() {
       let { token } = record;
       // set up socket client
       let socket;
-      if (clients[record.integration_id]) {
-        socket = clients[record.integration_id];
-      } else {
-        socket = new Socket(record.integration_id, record.system_code, token);
-        clients[record.integration_id] = socket;
-      }
+      // if (clients[record.integration_id]) {
+      //   socket = clients[record.integration_id];
+      // } else {
+      //   socket = new Socket(record.integration_id, record.system_code, token);
+      //   clients[record.integration_id] = socket;
+      // }
       await subThread(
         record.id,
         record.hotel_id,
@@ -181,6 +182,7 @@ console.log(
   '[hotel-integration ftp client startHandle]',
 );
 
+// start query ftp queue to send fifo message
 orderHandler();
 
 // schedule job in every minute
@@ -194,4 +196,4 @@ Cron.job('* * * * *', (() => {
   // startHandle the service
   run();
 }))
-  .startHandle();
+  .start();

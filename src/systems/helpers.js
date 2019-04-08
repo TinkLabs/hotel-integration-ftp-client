@@ -1,5 +1,5 @@
 /* eslint-disable import/prefer-default-export */
-import readline from 'readline'
+import readline from 'readline';
 import _ from 'lodash';
 import mapObj from 'map-obj';
 import dotProp from 'dot-prop';
