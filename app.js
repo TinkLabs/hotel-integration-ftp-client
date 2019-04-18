@@ -87,7 +87,7 @@ async function sendOneFile(cli, file, hotelId, socket) {
           'first reservation:', recordsMessage.reservations[0].reservation.reservation_id,
           'last reservation:', recordsMessage.reservations[chunkRecord.length - 1].reservation.reservation_id,
           'meta:', JSON.stringify(recordsMessage.meta));
-        await socket.send(recordsMessage);
+        // await socket.send(recordsMessage);
       });
 
     await sendToFtpQue(uniqueFileId);
