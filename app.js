@@ -4,99 +4,60 @@ import Promise from 'bluebird';
 import path from 'path';
 import uuid from 'uuid/v4';
 import { filter } from 'lodash';
-import { SQS } from 'aws-sdk';
+import moment from 'moment';
 import System from './src/systems/system';
 import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
 import {
-  insertFileMessage,
-  insertFileChunk,
-  selectFileMessageByUuid,
-  deleteChunkByFileId,
+  initReorderMessage,
 } from './src/database/sqlite';
 import orderHandler from './src/systems/order-handler';
 
 const running = new Set();
 const clients = {};
-const sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
 process.env.runtimePath = path.join(__dirname, 'runtime');
 
-/**
- * send the fileId to queue make order-handler can resend fileChunk to hig_hai_queue_[ENV].fifo
- * @param raw
- * @returns {Promise<Bluebird | Bluebird<any>>}
- */
-async function sendToFtpQue(raw) {
-  console.log('[start send message to hig_ftp_queue_staging.fifo sqs]');
-
-  let data = {
-    event: 'RESERVATIONS',
-    data: raw,
-  };
-
-  let ftpParams = {
-    QueueUrl: process.env.HAI_FTP_URL,
-    MessageBody: JSON.stringify(data),
-    MessageDeduplicationId: uuid(),
-    MessageGroupId: data.event,
-  };
-
-  return new Promise((resolve, reject) => {
-    sqs.sendMessage(ftpParams, (err, response) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(response);
-    });
-  });
-}
 
 async function sendOneFile(cli, file, hotelId, socket) {
   let uniqueFileId = uuid();
-  let fileMessage = await selectFileMessageByUuid(uniqueFileId);
-  if (fileMessage !== undefined && fileMessage.file_id === uniqueFileId) {
-    console.info(JSON.stringify(`already handling file with id: ${uniqueFileId}`, null, 2), '\n ');
-    return;
-  }
   let chunkInfo = await cli.getFileChunkInfo(file.file_name, 150);
-
-  insertFileMessage(uniqueFileId, chunkInfo.totalChunkCount);
   try {
-    // let sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
-    await cli.chunkFile(chunkInfo,
-      async (chunkRecord, chunkSeq, totalRecordCount) => {
-        let recordsMessage = {
-          meta: {
-            chunk_id: uuid(),
-            chunk_seq: chunkSeq,
-            total_record: totalRecordCount,
-            num_of_records: chunkRecord.length,
-            file_name: file.file_name,
-            last_modified: file.last_modified,
-            hotel_code: chunkRecord[0].reservation.hotel_code,
-            hotel_id: hotelId,
-          },
+    await initReorderMessage(uniqueFileId, chunkInfo.totalChunkCount);
+    await cli.chunkFile(chunkInfo, async (chunkRecord, chunkSeq, totalRecordCount) => {
+      console.log('[run chunk]', chunkRecord.length, chunkSeq, totalRecordCount);
+      let recordsMessage = {
+        event: 'RESERVATIONS',
+        meta: {
+          chunk_id: uuid(),
+          total_record: totalRecordCount,
+          num_of_records: chunkRecord.length,
+          file_name: file.file_name,
+          last_modified: moment(file.last_modified * 1000).format('YYYY-MM-DD HH:mm:ss'),
+          hotel_code: chunkRecord[0].reservation.hotel_code,
+          hotel_id: hotelId,
+          reorder: true,
+          reorder_chunk_count: chunkInfo.totalChunkCount,
+          reorder_unique_id: uniqueFileId,
+          reorder_chunk_seq: chunkSeq,
+        },
+        data: {
           reservations: chunkRecord,
-        };
-        console.info('[send one file with insert chunk]', 'file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(chunkSeq - 1, null, 2), '\n ');
-
-        await insertFileChunk(
-          uniqueFileId, chunkSeq - 1, JSON.stringify(recordsMessage),
-        );
-        console.log('[ emit message] ', 'total:', chunkRecord.length,
-          'first reservation:', recordsMessage.reservations[0].reservation.reservation_id,
-          'last reservation:', recordsMessage.reservations[chunkRecord.length - 1].reservation.reservation_id,
-          'meta:', JSON.stringify(recordsMessage.meta));
-        // await socket.send(recordsMessage);
-      });
-
-    await sendToFtpQue(uniqueFileId);
-
-    running.delete(file.file_name);
+        },
+      };
+      console.info('[send one file with insert chunk]', 'file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(chunkSeq, null, 2), '\n ');
+      console.log('[ emit message] ', 'total:', chunkRecord.length,
+        'first reservation:', recordsMessage.data.reservations[0].reservation.reservation_id,
+        'last reservation:', recordsMessage.data.reservations[chunkRecord.length - 1].reservation.reservation_id,
+        'meta:', JSON.stringify(recordsMessage.meta));
+      await socket.send(recordsMessage);
+    });
   } catch (e) {
     console.log('[send one file occur error:]', e.message, e.stack);
-    await deleteChunkByFileId(uniqueFileId);
+    // await deleteChunkByFileId(uniqueFileId);
     throw e;
+  } finally {
+    // await cli.deleteFile(file.file_name);
+    running.delete(file.file_name);
   }
 }
 
@@ -108,7 +69,9 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log('---not sorted fileList---');
     console.log(notSortedFileList);
 
-    let filterFileList = filter(notSortedFileList, o => !running.has(o.file_name));
+    const now = Number(new Date()) / 1000;
+    let filterFileList = filter(notSortedFileList,
+      o => !running.has(o.file_name) && (o.last_modified + 60) < now);
     console.log('---filter running fileList---');
     console.log(filterFileList);
 
@@ -116,9 +79,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log('---sorted fileList---');
     console.log(fileList);
 
-    fileList.forEach((o) => {
-      running.add(o.file_name);
-    });
+    fileList.forEach((o) => { running.add(o.file_name); });
     console.log('---lock file---');
     console.log(running);
 
@@ -128,7 +89,10 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       // eslint-disable-next-line no-await-in-loop
       await sendOneFile(cli, file, hotelId, socket);
     }
+
+    cli.closeFtp();
   } catch (err) {
+    console.log(err);
     // Error handling
     console.log(
       Chalk.red(new Date().toISOString()
@@ -181,7 +145,6 @@ console.log(
     .replace(/\..+/, ''), ':'),
   '[hotel-integration ftp client startHandle]',
 );
-
 // start query ftp queue to send fifo message
 orderHandler();
 
@@ -195,5 +158,4 @@ Cron.job('* * * * *', (() => {
   );
   // startHandle the service
   run();
-}))
-  .start();
+})).start();

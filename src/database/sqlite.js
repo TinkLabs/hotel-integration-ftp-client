@@ -1,166 +1,63 @@
-import Promise from 'bluebird';
 import path from 'path';
 import dotenv from 'dotenv';
 
 // load the .env file
 dotenv.load();
 
-let sqlite3 = require('sqlite3')
-  .verbose();
-
-const sqlite = new sqlite3.Database(path.join(__dirname, './ftp-client-sql'));
-const STATUS = {
-  WAIT_FOR_SEND: 'wait_for_send',
-  SEND_FINISH: 'send_finish',
+// const dbConfig = {
+//   client: 'sqlite3',
+//   connection: {
+//     filename: path.join(__dirname, './ftp-client-sql'),
+//   },
+//   useNullAsDefault: false,
+// };
+const dbConfig = {
+  client: 'mysql2',
+  connection: {
+    host: 'localhost',
+    user: 'root',
+    password: 'abc123',
+    database: 'backend2',
+  },
 };
+const reorderKnex = require('knex')(dbConfig);
 
-/**
- * init table
- */
-sqlite.serialize(() => {
-  sqlite.run('CREATE TABLE IF NOT EXISTS file_msg (file_id TEXT,chunk_num INT,status TEXT)');
-  sqlite.run('CREATE TABLE IF NOT EXISTS file_chunk (file_id TEXT,sequence_num INT,msg TEXT,status TEXT)');
-});
+// let sqlite3 = require('sqlite3').verbose();
+
+// const sqlite = new sqlite3.Database(dbConfig.connection.filename);
+// sqlite.serialize(() => {
+//   sqlite.run('CREATE TABLE IF NOT EXISTS reorder_messages (id TEXT PRIMARY KEY, chunk_count INT, chunk_received_count INT, status TEXT)');
+//   sqlite.run('CREATE TABLE IF NOT EXISTS reorder_message_chunks (id TEXT PRIMARY KEY, message_id TEXT, sequence INT, content TEXT)');
+// });
+// sqlite.close();
+
+const ENUM_REORDER_STATUS = {
+  CLIENT_SEND: 'client_send',
+  REORDER_RECEIVING: 'reorder_receiving',
+  REORDER_RECEIVED: 'reorder_received',
+  REORDER_SENDING: 'reorder_sending',
+  REORDER_FINISH: 'reorder_finish',
+  REORDER_ERROR: 'reorder_error',
+  CLIENT_FINISH: 'client_finish',
+};
 
 /**
  *
  * @param uniqueFileId
  * @param chunkRecordsLength
  */
-function insertFileMessage(uniqueFileId, chunkRecordsLength) {
-  return new Promise((resolve, reject) => {
-    sqlite.run('INSERT INTO file_msg(file_id,chunk_num,status) VALUES(?,?,?)',
-      [uniqueFileId, chunkRecordsLength, STATUS.WAIT_FOR_SEND], (err) => {
-        if (err) {
-          reject(err);
-        }
-        resolve();
-      });
+function initReorderMessage(uniqueFileId, chunkRecordsLength) {
+  return reorderKnex('reorder_messages').insert({
+    id: uniqueFileId,
+    chunk_count: chunkRecordsLength,
+    chunk_received_count: 0,
+    status: ENUM_REORDER_STATUS.CLIENT_SEND,
   });
 }
 
-/**
- *
- * @param uniqueFileId
- * @param sequenceNum
- * @param msg
- */
-function insertFileChunk(uniqueFileId, sequenceNum, msg) {
-  return new Promise((resolve, reject) => {
-    sqlite.run('INSERT INTO file_chunk(file_id,sequence_num,msg,status) VALUES(?,?,?,?)',
-      [uniqueFileId, sequenceNum, msg, STATUS.WAIT_FOR_SEND], (err) => {
-        if (err) {
-          reject(err);
-        }
-        resolve();
-      });
-  });
-}
-
-/**
- *
- * @param fileId
- * @returns
- * object:{file_id,chunk_num}
- */
-async function selectFileMessageByUuid(fileId) {
-  return new Promise((resolve, reject) => {
-    sqlite.get('SELECT file_id,chunk_num FROM file_msg where file_id =?', [fileId], (err, row) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(row);
-    });
-  });
-}
-
-/**
- *
- * @param fileId
- * @returns
- * object:{file_id,size}
- */
-async function selectFileChunkSizeByUuid(fileId) {
-  return new Promise((resolve, reject) => {
-    sqlite.get('SELECT file_id,count(file_id) as size FROM file_chunk where file_id =?', [fileId], (err, row) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(row);
-    });
-  });
-}
-
-async function selectFileChunkByFileIdOrderBySequence(fileId) {
-  return new Promise((resolve, reject) => {
-    sqlite.all('SELECT file_id,sequence_num,msg FROM file_chunk where file_id =? and status =? order by sequence_num', [fileId, STATUS.WAIT_FOR_SEND], (err, row) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(row);
-    });
-  });
-}
-
-
-/**
- *
- * @param fileId
- * @param status this.STATUS.[status]
- * @returns {Promise<Bluebird | Bluebird<any>>}
- */
-async function updateFileMsgByFileId(fileId, status) {
-  return new Promise((resolve, reject) => {
-    sqlite.run('UPDATE file_msg SET status=? where file_id =?', [status, fileId], (err) => {
-      if (err) {
-        console.info(JSON.stringify(`delete from file_msg with FileId=${fileId} failed`, null, 2), '\n ');
-        reject(err);
-      }
-      resolve();
-    });
-  });
-}
-
-/**
- *
- * @param fileId
- * @param sequenceNum
- * @param status this.STATUS.[status]
- * @returns {Promise<Bluebird | Bluebird<any>>}
- */
-async function updateChunkByFileIdAndSequenceNum(fileId, sequenceNum, status) {
-  return new Promise((resolve, reject) => {
-    sqlite.run('UPDATE file_chunk SET status=? where file_id =? and sequence_num=?', [status, fileId, sequenceNum], (err) => {
-      if (err) {
-        console.info(JSON.stringify(`delete from file_chunk with FileId=${fileId} failed`, null, 2), '\n ');
-        reject(err);
-      }
-      resolve();
-    });
-  });
-}
-
-
-async function deleteChunkByFileId(fileId) {
-  return new Promise((resolve, reject) => {
-    sqlite.run('DELETE FROM file_chunk where file_id =?', [fileId], (err) => {
-      if (err) {
-        console.info(JSON.stringify(`delete from file_chunk with FileId=${fileId} failed`, null, 2), '\n ');
-        reject(err);
-      }
-    });
-  });
-}
 
 export {
-  sqlite,
-  STATUS,
-  insertFileMessage,
-  insertFileChunk,
-  selectFileMessageByUuid,
-  selectFileChunkSizeByUuid,
-  selectFileChunkByFileIdOrderBySequence,
-  updateFileMsgByFileId,
-  updateChunkByFileIdAndSequenceNum,
-  deleteChunkByFileId,
+  reorderKnex,
+  ENUM_REORDER_STATUS,
+  initReorderMessage,
 };
