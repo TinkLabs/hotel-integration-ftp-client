@@ -13,10 +13,8 @@ export default class SocketClient extends EventEmitter {
   }
 
   // send data to pms
-  send(raw) {
+  send(data) {
     console.log(`sending message to socket, with token: ${this.token}`);
-    const data = { event: 'RESERVATIONS', data: raw };
-
     this.socket.emit('pms_data', data);
     return true;
   }
@@ -32,10 +30,12 @@ export default class SocketClient extends EventEmitter {
     // add listener
     this.socket.on('connect', () => {
       this.emit('connect');
+      console.log('connect');
     });
 
     this.socket.on('disconnect', () => {
       this.emit('disconnect');
+      console.log('disconnect');
     });
 
     this.socket.on('error', (error) => {

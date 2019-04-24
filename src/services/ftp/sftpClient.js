@@ -5,14 +5,18 @@ import Promise from 'bluebird';
 import path from 'path';
 import aws from 'aws-sdk';
 import timestamp from 'time-stamp';
+import fs from 'fs';
+
+const S3_TAGGING = 'source=ftp-client';
 
 export default class SftpClient extends EventEmitter {
   constructor(hotelId, config, remote) {
     super();
 
-    this.conn = null;
     this.config = config;
+    // TODO remember change back to `remote` when commit
     this.remote = path.join('.', remote);
+    // this.remote = 'test/cypher_import';
     this.hotelId = hotelId;
     this.s3 = new aws.S3({
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -20,92 +24,108 @@ export default class SftpClient extends EventEmitter {
       region: process.env.AWS_DEFAULT_REGION,
     });
 
-    const busketName = 'hig2-ftp-data';
+    const bucketName = 'hig2-ftp-data';
     switch (process.env.ENV_STAGE.toLowerCase()) {
       case 'prod':
-        this.s3Busket = busketName;
+        this.s3Busket = bucketName;
         break;
       case 'stg':
-        this.s3Busket = `${busketName}-staging`;
+        this.s3Busket = `${bucketName}-staging`;
         break;
       case 'dev':
       default:
-        this.s3Busket = `${busketName}-dev`;
+        this.s3Busket = `${bucketName}-dev`;
         break;
     }
 
-    this.initFtp();
+    this.FTPConn = null;
+    this.SSHConn = null;
   }
 
   async getDir() {
+    await this.initFTPConnect();
     return new Promise((resolve, reject) => {
-      // add listener to read
-      this.conn.once('ready', () => {
-        this.conn.sftp((connErr, sftp) => {
-          if (connErr) reject(connErr);
-          // read remote directory
-          sftp.readdir(this.remote, (err, list) => {
-            if (err) reject(err);
-            // return array
-            resolve(list);
-          });
-        });
-        // sftp connection
-      }).connect(this.config);
-      // close sftp connection
-    }).finally(() => { this.conn.end(); });
+      this.FTPConn.readdir(this.remote, (err, list) => {
+        if (err) reject(err);
+        console.info(JSON.stringify(list, null, 2), '\n ');
+        // return array
+        resolve(list);
+      });
+    });
   }
 
-  async dowmloadFile(fileName, encode = 'utf8') {
+  async downloadFile(fileName, encode = 'utf8') {
+    await this.initFTPConnect();
     return new Promise((resolve, reject) => {
-      // add listener to read
-      this.conn.once('ready', () => {
-        this.conn.sftp((connErr, sftp) => {
-          if (connErr) reject(connErr);
-          // destination path
-          const remotePath = path.join(this.remote, fileName);
-          const storePath = path.join(
-            this.hotelId !== 'string' ? this.hotelId.toString() : this.hotelId,
-            `${timestamp.utc('YYYYMMDDHHmmss')}_${fileName}`,
-          );
+      // destination path
+      const remotePath = path.join(this.remote, fileName);
+      const localPath = path.join(process.env.runtimePath, `${fileName}`);
+      const storePath = path.join(
+        this.hotelId !== 'string' ? this.hotelId.toString() : this.hotelId,
+        `${timestamp.utc('YYYYMMDDHHmmss')}_${fileName}`,
+      );
 
-          // download file
-          sftp.readFile(remotePath, encode, (err, buff) => {
-            if (err) reject(err);
+      // download file
+      this.FTPConn.fastGet(remotePath, localPath, (err) => {
+        if (err) reject(err);
 
-            // upload data to s3
-            this.s3.putObject({ Bucket: this.s3Busket, Key: storePath, Body: buff })
-              .promise()
-              .then(() => { resolve(buff.toString(encode).trim()); })
-              .catch((uploadErr) => { reject(uploadErr); });
-          });
-        });
-        // sftp connection
-      }).connect(this.config);
-      // close sftp connection
-    }).finally(() => { this.conn.end(); });
+        let stream = fs.createReadStream(localPath, { encoding: encode });
+        // upload data to s3
+        let s3Conf = {
+          Bucket: this.s3Busket,
+          Key: storePath,
+          Body: stream,
+          Tagging: S3_TAGGING,
+        };
+        // this.s3.putObject(s3Conf)
+        //   .promise()
+        //   .then(() => {
+            resolve(localPath);
+          // })
+          // .catch((uploadErr) => { reject(uploadErr); });
+      });
+    });
   }
 
   async deleteFile(fileName) {
+    await this.initFTPConnect();
     return new Promise((resolve, reject) => {
-      this.conn.once('ready', () => {
-        this.conn.sftp((connErr, sftp) => {
-          if (connErr) reject(connErr);
-          sftp.unlink(
-            path.join(this.remote, fileName),
-            (err) => { if (err) reject(err); resolve(true); },
-          );
-        });
-      }).connect(this.config);
-    }).finally(() => { this.conn.end(); });
+      this.FTPConn.unlink(
+        path.join(this.remote, fileName),
+        (err) => {
+          if (err) reject(err);
+          resolve(true);
+        },
+      );
+    });
   }
 
-  initFtp() {
-    this.conn = new ssh2.Client();
-
-    // TODO: add listener
-    this.conn.on('error', (err) => {
-      this.emit('error', err);
+  initFTPConnect() {
+    return new Promise((resolve, reject) => {
+      if (this.FTPConn && this.SSHConn) {
+        resolve();
+      } else {
+        let ssh = new ssh2.Client();
+        ssh.once('ready', () => {
+          ssh.sftp((err, sftp) => {
+            if (err) {
+              reject(err);
+            }
+            this.FTPConn = sftp;
+            this.SSHConn = ssh;
+            resolve();
+          });
+        }).connect(this.config);
+      }
     });
+  }
+
+  closeFTPConnect() {
+    if (this.FTPConn) {
+      this.FTPConn.end();
+    }
+    if (this.SSHConn) {
+      this.SSHConn.end();
+    }
   }
 }
