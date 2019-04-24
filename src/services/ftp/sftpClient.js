@@ -77,12 +77,12 @@ export default class SftpClient extends EventEmitter {
           Body: stream,
           Tagging: S3_TAGGING,
         };
-        // this.s3.putObject(s3Conf)
-        //   .promise()
-        //   .then(() => {
+        this.s3.putObject(s3Conf)
+          .promise()
+          .then(() => {
             resolve(localPath);
-          // })
-          // .catch((uploadErr) => { reject(uploadErr); });
+          })
+          .catch((uploadErr) => { reject(uploadErr); });
       });
     });
   }
