@@ -1,35 +1,19 @@
-import path from 'path';
 import dotenv from 'dotenv';
 
 // load the .env file
 dotenv.load();
 
-// const dbConfig = {
-//   client: 'sqlite3',
-//   connection: {
-//     filename: path.join(__dirname, './ftp-client-sql'),
-//   },
-//   useNullAsDefault: false,
-// };
 const dbConfig = {
   client: 'mysql2',
   connection: {
-    host: 'localhost',
-    user: 'root',
-    password: 'abc123',
-    database: 'backend2',
+    host: process.env.REORDER_DB_HOST,
+    port: process.env.REORDER_DB_PORT,
+    user: process.env.REORDER_DB_USER,
+    password: process.env.REORDER_DB_PASSWORD,
+    database: process.env.REORDER_DB_DATABASE,
   },
 };
 const reorderKnex = require('knex')(dbConfig);
-
-// let sqlite3 = require('sqlite3').verbose();
-
-// const sqlite = new sqlite3.Database(dbConfig.connection.filename);
-// sqlite.serialize(() => {
-//   sqlite.run('CREATE TABLE IF NOT EXISTS reorder_messages (id TEXT PRIMARY KEY, chunk_count INT, chunk_received_count INT, status TEXT)');
-//   sqlite.run('CREATE TABLE IF NOT EXISTS reorder_message_chunks (id TEXT PRIMARY KEY, message_id TEXT, sequence INT, content TEXT)');
-// });
-// sqlite.close();
 
 const ENUM_REORDER_STATUS = {
   CLIENT_SEND: 'client_send',
@@ -42,19 +26,19 @@ const ENUM_REORDER_STATUS = {
 };
 
 /**
- *
  * @param uniqueFileId
  * @param chunkRecordsLength
  */
 function initReorderMessage(uniqueFileId, chunkRecordsLength) {
-  return reorderKnex('reorder_messages').insert({
+  return reorderKnex('reservation_reorder_messages').insert({
     id: uniqueFileId,
     chunk_count: chunkRecordsLength,
     chunk_received_count: 0,
     status: ENUM_REORDER_STATUS.CLIENT_SEND,
+    modify_at: reorderKnex.fn.now(),
+    create_at: reorderKnex.fn.now(),
   });
 }
-
 
 export {
   reorderKnex,

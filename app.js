@@ -10,7 +10,7 @@ import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
 import {
   initReorderMessage,
-} from './src/database/sqlite';
+} from './src/database/reorderKnex';
 import orderHandler from './src/systems/order-handler';
 
 const running = new Set();
@@ -53,10 +53,9 @@ async function sendOneFile(cli, file, hotelId, socket) {
     });
   } catch (e) {
     console.log('[send one file occur error:]', e.message, e.stack);
-    // await deleteChunkByFileId(uniqueFileId);
     throw e;
   } finally {
-    // await cli.deleteFile(file.file_name);
+    await cli.deleteFile(file.file_name);
     running.delete(file.file_name);
   }
 }

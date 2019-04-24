@@ -1,5 +1,5 @@
 
-import { initReorderMessage } from '../src/database/sqlite';
+import { initReorderMessage } from '../src/database/reorderKnex';
 
 
 initReorderMessage(1, 2);
