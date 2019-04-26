@@ -131,7 +131,7 @@ async function monitorMessage() {
           .then((record) => {
             if (record.status === REORDER_STATUS.RECEIVED) {
               reorderKnex('reservation_reorder_messages').where('id', record.id).update({ status: REORDER_STATUS.PENDING, modify_at: reorderKnex.fn.now() }).then(() => { });
-            } else if (new Date() - record.modify_at > 60 * 1000) {
+            } else if (new Date() - record.modify_at > 60 * 60 * 1000) {
               // 一般都是发送到HAI-QUEUE的过程中，关闭了进程导致的，可以考虑自动回滚为PENDING，暂时手工处理吧
               // if (record.status === REORDER_STATUS.PENDING) {
               // eslint-disable-next-line max-len

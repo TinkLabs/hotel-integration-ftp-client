@@ -14,7 +14,7 @@ import {
 import orderHandler from './src/systems/order-handler';
 
 const running = new Set();
-const clients = {};
+process.env.TZ = 'UAT';
 process.env.runtimePath = path.join(__dirname, 'runtime');
 
 
@@ -22,7 +22,7 @@ async function sendOneFile(cli, file, hotelId, socket) {
   let uniqueFileId = uuid();
   let chunkInfo = await cli.getFileChunkInfo(file.file_name, 150);
   try {
-    await initReorderMessage(uniqueFileId, chunkInfo.totalChunkCount);
+    await initReorderMessage(hotelId, uniqueFileId, chunkInfo.totalChunkCount);
     await cli.chunkFile(chunkInfo, async (chunkRecord, chunkSeq, totalRecordCount) => {
       console.log('[run chunk]', chunkRecord.length, chunkSeq, totalRecordCount);
       let recordsMessage = {
@@ -56,7 +56,6 @@ async function sendOneFile(cli, file, hotelId, socket) {
     throw e;
   } finally {
     await cli.deleteFile(file.file_name);
-    running.delete(file.file_name);
   }
 }
 
@@ -68,21 +67,15 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log('---not sorted fileList---');
     console.log(notSortedFileList);
 
-    const now = Number(new Date()) / 1000;
-    let filterFileList = filter(notSortedFileList,
-      o => !running.has(o.file_name) && (o.last_modified + 60) < now);
-    console.log('---filter running fileList---');
+    const now = Math.floor(Number(new Date()) / 1000);
+    let filterFileList = filter(notSortedFileList, o => (o.last_modified) < now);
+    console.log('---filter fileList---');
     console.log(filterFileList);
 
     let fileList = filterFileList.sort((file1, file2) => file1.last_modified - file2.last_modified);
     console.log('---sorted fileList---');
     console.log(fileList);
 
-    fileList.forEach((o) => { running.add(o.file_name); });
-    console.log('---lock file---');
-    console.log(running);
-
-    // let sqs = new SQS({ region: process.env.AWS_DEFAULT_REGION });
     // eslint-disable-next-line no-restricted-syntax
     for (let file of fileList) {
       // eslint-disable-next-line no-await-in-loop
@@ -100,6 +93,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
       `[Error] Hotel[${hotelId}] ${err}`,
     );
   } finally {
+    running.delete(ftpId);
     await db('integration_ftp')
       .where('id', ftpId)
       .update({ last_connected: db.fn.now() });
@@ -117,14 +111,14 @@ async function run() {
   await Promise.all(
     res.map(async (record) => {
       let { token } = record;
-      // set up socket client
-      let socket;
-      if (clients[record.integration_id]) {
-        socket = clients[record.integration_id];
-      } else {
-        socket = new Socket(record.integration_id, record.system_code, token);
-        clients[record.integration_id] = socket;
+
+      if (running.has(record.id)) {
+        console.log(`hotel ${record.id} ${JSON.stringify(running)} is running, return`);
+        return null;
       }
+      running.add(record.id);
+
+      let socket = new Socket(record.integration_id, record.system_code, token);
       await subThread(
         record.id,
         record.hotel_id,
@@ -132,6 +126,7 @@ async function run() {
         JSON.parse(record.file_config || '{}'),
         socket,
       );
+
       return record;
     }),
   );
