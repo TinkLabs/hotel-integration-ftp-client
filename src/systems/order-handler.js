@@ -161,6 +161,10 @@ async function monitorMessage() {
 }
 
 export default function startHandle() {
+  if (process.env.REORDER_ENABLE === 0) {
+    return;
+  }
+
   // monitor message status.
   monitorMessage();
 
