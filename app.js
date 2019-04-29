@@ -10,13 +10,18 @@ import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
 import {
   initReorderMessage,
+  insertReorderMessageChunk,
 } from './src/database/reorderKnex';
-import orderHandler from './src/systems/order-handler';
+import { orderHandler, orderResend } from './src/systems/order-handler';
 
 const running = new Set();
-process.env.TZ = 'UAT';
+const sockets = {};
+// process.env.TZ = 'UAT';
 process.env.runtimePath = path.join(__dirname, 'runtime');
 
+async function sleep(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
 
 async function sendOneFile(cli, file, hotelId, socket) {
   let uniqueFileId = uuid();
@@ -25,36 +30,35 @@ async function sendOneFile(cli, file, hotelId, socket) {
     await initReorderMessage(hotelId, uniqueFileId, chunkInfo.totalChunkCount);
     await cli.chunkFile(chunkInfo, async (chunkRecord, chunkSeq, totalRecordCount) => {
       console.log('[run chunk]', chunkRecord.length, chunkSeq, totalRecordCount);
+      let chunkId = uuid();
       let recordsMessage = {
         event: 'RESERVATIONS',
-        meta: {
-          chunk_id: uuid(),
-          total_record: totalRecordCount,
-          num_of_records: chunkRecord.length,
-          file_name: file.file_name,
-          last_modified: moment(file.last_modified * 1000).format('YYYY-MM-DD HH:mm:ss'),
-          hotel_code: chunkRecord[0].reservation.hotel_code,
-          hotel_id: hotelId,
-          reorder: true,
-          reorder_chunk_count: chunkInfo.totalChunkCount,
-          reorder_unique_id: uniqueFileId,
-          reorder_chunk_seq: chunkSeq,
-        },
         data: {
+          meta: {
+            chunk_id: chunkId,
+            total_record: totalRecordCount,
+            num_of_records: chunkRecord.length,
+            file_name: file.file_name,
+            last_modified: file.last_modified,,
+            hotel_code: chunkRecord[0].reservation.hotel_code,
+            hotel_id: hotelId,
+            reorder: true,
+            reorder_chunk_count: chunkInfo.totalChunkCount,
+            reorder_unique_id: uniqueFileId,
+            reorder_chunk_seq: chunkSeq,
+          },
           reservations: chunkRecord,
         },
       };
       console.info('[send one file with insert chunk]', 'file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(chunkSeq, null, 2), '\n ');
-      console.log('[ emit message] ', 'total:', chunkRecord.length,
-        'first reservation:', recordsMessage.data.reservations[0].reservation.reservation_id,
-        'last reservation:', recordsMessage.data.reservations[chunkRecord.length - 1].reservation.reservation_id,
-        'meta:', JSON.stringify(recordsMessage.meta));
+      await insertReorderMessageChunk(chunkId, uniqueFileId, chunkSeq, JSON.stringify(recordsMessage));
       await socket.send(recordsMessage);
     });
   } catch (e) {
     console.log('[send one file occur error:]', e.message, e.stack);
     throw e;
   } finally {
+    await sleep(1100);
     await cli.deleteFile(file.file_name);
   }
 }
@@ -68,7 +72,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log(notSortedFileList);
 
     const now = Math.floor(Number(new Date()) / 1000);
-    let filterFileList = filter(notSortedFileList, o => (o.last_modified + 60) < now);
+    let filterFileList = filter(notSortedFileList, o => (o.last_modified) < now);
     console.log('---filter fileList---');
     console.log(filterFileList);
 
@@ -119,6 +123,7 @@ async function run() {
       running.add(record.id);
 
       let socket = new Socket(record.integration_id, record.system_code, token);
+      sockets[record.hotel_id] = socket;
       await subThread(
         record.id,
         record.hotel_id,
@@ -139,6 +144,7 @@ console.log(
     .replace(/\..+/, ''), ':'),
   '[hotel-integration ftp client startHandle]',
 );
+
 // start query ftp queue to send fifo message
 orderHandler();
 
@@ -153,3 +159,7 @@ Cron.job('* * * * *', (() => {
   // startHandle the service
   run();
 })).start();
+
+setInterval(() => {
+  orderResend(sockets);
+}, 10000);

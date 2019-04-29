@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import moment from 'moment';
 
 // load the .env file
 dotenv.load();
@@ -24,7 +25,15 @@ const REORDER_STATUS = {
   FINISH: 'reorder_finish',
   ERROR: 'reorder_error',
   TIMEOUT: 'reorder_timeout',
+
+  CHUNK_SEND: 'chunk_send',
+  CHUNK_RECEIVED: 'chunk_received',
+  CHUNK_FINISH: 'chunk_finish',
 };
+
+function mysqlNow() {
+  return moment().format('YYYY-MM-DD HH:mm:ss');
+}
 
 /**
  * @param uniqueFileId
@@ -37,13 +46,43 @@ function initReorderMessage(hotelId, uniqueFileId, chunkRecordsLength) {
     chunk_count: chunkRecordsLength,
     chunk_received_count: 0,
     status: REORDER_STATUS.INIT,
-    modify_at: reorderKnex.fn.now(),
-    create_at: reorderKnex.fn.now(),
+    modify_at: mysqlNow(),
+    create_at: mysqlNow(),
   });
+}
+
+function insertReorderMessageChunk(chunkId, msgId, seq, raw) {
+  return reorderKnex('reservation_reorder_message_chunks').insert({
+    id: chunkId,
+    message_id: msgId,
+    sequence: seq,
+    raw,
+    status: REORDER_STATUS.CHUNK_SEND,
+    create_at: mysqlNow(),
+    modify_at: mysqlNow(),
+  });
+}
+
+async function nextMessage(hotelId) {
+  let record = await reorderKnex('reservation_reorder_messages')
+    .where('hotel_id', hotelId)
+    .whereIn('status', [
+      REORDER_STATUS.INIT,
+      REORDER_STATUS.RECEIVING,
+      REORDER_STATUS.RECEIVED,
+      REORDER_STATUS.SENDING,
+      REORDER_STATUS.PENDING,
+    ])
+    .orderBy('create_at', 'asc')
+    .first();
+  return record;
 }
 
 export {
   reorderKnex,
   REORDER_STATUS,
   initReorderMessage,
+  insertReorderMessageChunk,
+  nextMessage,
+  mysqlNow,
 };
