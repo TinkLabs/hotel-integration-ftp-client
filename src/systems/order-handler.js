@@ -18,7 +18,7 @@ async function sendToHaiQueue(raw) {
   delete message.data.meta.reorder_unique_id;
   delete message.data.meta.reorder_chunk_count;
   delete message.data.meta.reorder;
-  delete message.data.meta.recoder_chunk_seq;
+  delete message.data.meta.reorder_chunk_seq;
 
   let haiQueueParams = {
     QueueUrl: process.env.HAI_QUEUE_URL,
