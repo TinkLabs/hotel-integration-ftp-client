@@ -13,10 +13,8 @@ export default class SocketClient extends EventEmitter {
   }
 
   // send data to pms
-  send(raw) {
+  send(data) {
     console.log(`sending message to socket, with token: ${this.token}`);
-    const data = { event: 'RESERVATIONS', data: raw };
-
     this.socket.emit('pms_data', data);
     return true;
   }

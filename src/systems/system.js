@@ -24,6 +24,11 @@ async function fileLineTotal(fileName, newLineCharacter) {
   });
 }
 
+async function sleep(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+
 export default class System extends EventEmitter {
   constructor(hotelId, ftpConfig, fileConfig) {
     super();
@@ -89,7 +94,6 @@ export default class System extends EventEmitter {
         readCount += 1;
 
         if (i >= chunkSize || readCount === totalRecordCount) {
-          chunkSeq += 1;
           let raw = buf;
           buf = '';
           i = 0;
@@ -104,8 +108,10 @@ export default class System extends EventEmitter {
 
           console.log('parser chunk:', chunkSeq, 'last record:', readCount, 'totalChunkCount:', totalChunkCount);
           // eslint-disable-next-line no-await-in-loop
-          // chunkRecord, chunkSeq, totalRecordCount
           await cb(chunkRecord, chunkSeq, totalRecordCount);
+          chunkSeq += 1;
+          // eslint-disable-next-line no-await-in-loop
+          await sleep(300);
         }
       }
     }
@@ -138,5 +144,9 @@ export default class System extends EventEmitter {
     this.ftp.on('error', (err) => {
       console.log(Chalk.red(new Date().toISOString(), ':'), `[FTP Error] Hotel[${this.hotelId}] `, JSON.stringify(err));
     });
+  }
+
+  closeFtp() {
+    this.ftp.closeFTPConnect();
   }
 }
