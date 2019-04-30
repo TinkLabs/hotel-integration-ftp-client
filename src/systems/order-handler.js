@@ -184,6 +184,7 @@ export async function orderResend(sockets) {
                     console.log(`[orderResend] resend message msgId:${msg.id}, chunkId:${chunk.id}`);
                   });
                 });
+              reorderKnex('reservation_reorder_messages').where('id', msg.id).update({ modify_at: mysqlNow() }).then(() => { });
             } else {
               // chunk lose before send to socket. set status to error.
               reorderKnex('reservation_reorder_messages').where('id', msg.id).update({ status: REORDER_STATUS.ERROR, modify_at: mysqlNow() }).then(() => { });
