@@ -39,7 +39,7 @@ async function sendOneFile(cli, file, hotelId, socket) {
             total_record: totalRecordCount,
             num_of_records: chunkRecord.length,
             file_name: file.file_name,
-            last_modified: file.last_modified,,
+            last_modified: file.last_modified,
             hotel_code: chunkRecord[0].reservation.hotel_code,
             hotel_id: hotelId,
             reorder: true,
