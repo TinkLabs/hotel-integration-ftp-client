@@ -15,10 +15,10 @@ let sqs = new AWS.SQS({ region: 'ap-southeast-1' });
 
 async function sendToHaiQueue(raw) {
   let message = JSON.parse(raw);
-  delete message.meta.reorder_unique_id;
-  delete message.meta.reorder_chunk_count;
-  delete message.meta.reorder;
-  // delete message.meta.recoder_chunk_seq;
+  delete message.data.meta.reorder_unique_id;
+  delete message.data.meta.reorder_chunk_count;
+  delete message.data.meta.reorder;
+  delete message.data.meta.recoder_chunk_seq;
 
   let haiQueueParams = {
     QueueUrl: process.env.HAI_QUEUE_URL,
@@ -43,7 +43,7 @@ async function reorderReceive() {
     handleMessage: async (message) => {
       let raw = message.Body;
       let msg = JSON.parse(raw);
-      let { meta } = msg;
+      let meta = msg.meta ? msg.meta : msg.data.meta;
       if (!meta) {
         return;
       }
@@ -98,7 +98,7 @@ async function reorderSend() {
       // eslint-disable-next-line no-await-in-loop
       let chunk = await reorderKnex('reservation_reorder_message_chunks').where({ message_id: messageId, sequence: i }).first('*');
       // eslint-disable-next-line no-await-in-loop
-      if (chunk && chunk.content && chunk.status === REORDER_STATUS.CHUNK_FINISH) {
+      if (chunk && chunk.content && chunk.status === REORDER_STATUS.CHUNK_RECEIVED) {
         await sendToHaiQueue(chunk.content);
         reorderKnex('reservation_reorder_messages').where('id', messageId).update({ modify_at: mysqlNow() }).then(() => { });
       }

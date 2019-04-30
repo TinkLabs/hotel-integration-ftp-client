@@ -72,7 +72,7 @@ async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
     console.log(notSortedFileList);
 
     const now = Math.floor(Number(new Date()) / 1000);
-    let filterFileList = filter(notSortedFileList, o => (o.last_modified) < now);
+    let filterFileList = filter(notSortedFileList, o => (o.last_modified + 60) < now);
     console.log('---filter fileList---');
     console.log(filterFileList);
 
