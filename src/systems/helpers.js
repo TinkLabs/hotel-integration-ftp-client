@@ -12,6 +12,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
   let records = raw.split(rdSplit);
   records = _.drop(records, header);
   records = _.dropRight(records, footer);
+  records = _.filter(records, record => record.length > 0);
 
   return records.map((record) => {
     record = record.split(fdSplit);
