@@ -1,27 +1,19 @@
 import EventEmitter from 'events';
 import Chalk from 'chalk';
 import fs from 'fs';
-import LineByLine from './LineByLine';
+import ReadLineAsync from './readline-async';
 import SftpClient from '../services/ftp/sftpClient';
 import { parser } from './helpers';
 
+
 async function fileLineTotal(fileName, newLineCharacter) {
-  const lf = newLineCharacter.charCodeAt(0);
-  return new Promise((resolve, reject) => {
-    try {
-      let i;
-      let count = 0;
-      fs.createReadStream(fileName)
-        .on('data', (chunk) => {
-          for (i = 0; i < chunk.length; i += 1) if (chunk[i] === lf) count += 1;
-        })
-        .on('end', () => {
-          resolve(count);
-        });
-    } catch (e) {
-      reject(e);
-    }
-  });
+  const rl = new ReadLineAsync(fileName, { separator: newLineCharacter });
+  let i = 0;
+  // eslint-disable-next-line no-await-in-loop
+  while (await rl.next() !== false) {
+    i += 1;
+  }
+  return i;
 }
 
 async function sleep(ms) {
@@ -75,7 +67,7 @@ export default class System extends EventEmitter {
       localFile, totalLine, totalRecordCount, totalChunkCount, chunkSize,
     } = chunkInfo;
 
-    let rl = new LineByLine(localFile, { newLineCharacter: setting.recordSplit });
+    let rl = new ReadLineAsync(localFile, { separator: setting.recordSplit });
     let line;
     let buf = '';
     let i = 0;
@@ -85,11 +77,11 @@ export default class System extends EventEmitter {
 
     console.log('chunk file:', localFile, 'totalLine:', totalLine, 'totalRecordCount:', totalRecordCount);
 
-    // eslint-disable-next-line no-cond-assign
-    while (line = rl.next()) {
+    // eslint-disable-next-line no-cond-assign, no-await-in-loop
+    while (line = await rl.next()) {
       lineNum += 1;
       if (lineNum > setting.ignoredTop && lineNum <= totalLine - setting.ignoredBot) {
-        buf += (buf === '' ? line : setting.recordSplit + line);
+        buf += line;
         i += 1;
         readCount += 1;
 
