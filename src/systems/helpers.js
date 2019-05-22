@@ -7,7 +7,16 @@ import crypto from 'crypto';
 import dateformat from 'dateformat';
 import empty from 'is-empty';
 import moment from 'moment';
-import { langMapping } from 'hig2tools';
+
+function langMapping(map, field, original) {
+  if (map) {
+    let subMap = map[field];
+    if (subMap && subMap[original]) {
+      return subMap[original];
+    }
+  }
+  return original;
+}
 
 export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping, languageMap) {
   let records = raw.split(rdSplit);
