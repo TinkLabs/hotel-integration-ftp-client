@@ -5,6 +5,6 @@ COPY ./ /app
 WORKDIR /app
 
 # Install app dependencies
-RUN mkdir runtime
+RUN npm install && mkdir runtime
 
 CMD ["npm", "start"]
