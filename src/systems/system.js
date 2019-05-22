@@ -22,7 +22,7 @@ async function sleep(ms) {
 
 
 export default class System extends EventEmitter {
-  constructor(hotelId, ftpConfig, fileConfig) {
+  constructor(hotelId, ftpConfig, fileConfig, languageMap) {
     super();
 
     this.socket = null;
@@ -30,7 +30,7 @@ export default class System extends EventEmitter {
     this.hotelId = hotelId;
     this.fileConfig = fileConfig;
     this.ftpConfig = ftpConfig;
-
+    this.languageMap = languageMap;
     this.initFtp();
   }
 
@@ -96,6 +96,7 @@ export default class System extends EventEmitter {
             0, // bot already ingored too.
             setting.recordSplit, setting.fieldSplit,
             setting.dataSchema,
+            this.languageMap,
           );
 
           console.log('parser chunk:', chunkSeq, 'last record:', readCount, 'totalChunkCount:', totalChunkCount);

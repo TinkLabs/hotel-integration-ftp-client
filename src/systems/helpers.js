@@ -7,8 +7,9 @@ import crypto from 'crypto';
 import dateformat from 'dateformat';
 import empty from 'is-empty';
 import moment from 'moment';
+import { langMapping } from 'hig2tools';
 
-export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
+export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping, languageMap) {
   let records = raw.split(rdSplit);
   records = _.drop(records, header);
   records = _.dropRight(records, footer);
@@ -98,7 +99,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
         guest_privacy: !empty(record.guest_privacy) ? record.guest_privacy : '',
         external: !empty(record.external) ? record.external : '',
         crs_profile_id: !empty(record.crs_profile_id) ? record.crs_profile_id : '',
-        language: !empty(record.language) ? record.language : '',
+        language: langMapping(languageMap, 'language', record.language),
       },
       renvenue: {
         currency: !empty(record.currency) ? record.currency : '',
