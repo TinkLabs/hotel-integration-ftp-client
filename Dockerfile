@@ -1,4 +1,4 @@
-FROM node:10-jessie-slim
+FROM node:8
 ARG GIT_TOKEN
 # Bundle APP files
 COPY ./ /app
