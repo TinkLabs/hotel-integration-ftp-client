@@ -3,8 +3,6 @@ FROM node:10-jessie-slim
 COPY ./ /app
 # Set working directory
 WORKDIR /app
-
 # Install app dependencies
-RUN mkdir runtime
-
+RUN npm install && mkdir runtime
 CMD ["npm", "start"]
