@@ -18,7 +18,7 @@ function langMapping(map, field, original) {
   return original;
 }
 
-export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping, languageMap) {
+export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
   let records = raw.split(rdSplit);
   records = _.drop(records, header);
   records = _.dropRight(records, footer);
@@ -108,7 +108,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping, lang
         guest_privacy: !empty(record.guest_privacy) ? record.guest_privacy : '',
         external: !empty(record.external) ? record.external : '',
         crs_profile_id: !empty(record.crs_profile_id) ? record.crs_profile_id : '',
-        language: langMapping(languageMap, 'language', record.language),
+        language: !empty(record.language) ? record.language : '',
       },
       renvenue: {
         currency: !empty(record.currency) ? record.currency : '',

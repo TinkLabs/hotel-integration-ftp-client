@@ -64,9 +64,9 @@ async function sendOneFile(cli, file, hotelId, socket) {
 }
 
 // Async Sub-thread script
-async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket, languageMap) {
+async function subThread(ftpId, hotelId, ftpConfig, fileConfig, socket) {
   try {
-    const cli = new System(hotelId, ftpConfig, fileConfig, languageMap);
+    const cli = new System(hotelId, ftpConfig, fileConfig);
     let notSortedFileList = await cli.getDir();
     console.log('---not sorted fileList---');
     console.log(notSortedFileList);
@@ -110,7 +110,7 @@ async function run() {
   let res = await db('integration_ftp')
     .whereRaw('NOW() >= DATE_ADD(`last_connected`, INTERVAL `time_interval` MINUTE)')
     .leftJoin('integrations', 'integration_ftp.integration_id', 'integrations.id')
-    .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config', 'integrations.token', 'integrations.language_map');
+    .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config', 'integrations.token');
 
   await Promise.all(
     res.map(async (record) => {
@@ -130,7 +130,6 @@ async function run() {
         JSON.parse(record.ftp_config || '{}'),
         JSON.parse(record.file_config || '{}'),
         socket,
-        JSON.parse(record.language_map || {}),
       );
 
       return record;
