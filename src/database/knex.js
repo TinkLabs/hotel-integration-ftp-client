@@ -4,7 +4,9 @@ import dotenv from 'dotenv';
 // load the .env file
 dotenv.load();
 
-export default require('knex')({
+let knex = require('knex');
+
+export default knex({
   client: 'mysql2',
   connection: {
     host: process.env.DB_HOST,

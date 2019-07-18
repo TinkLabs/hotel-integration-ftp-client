@@ -1,12 +1,8 @@
 FROM node:10-jessie-slim
-
 # Bundle APP files
 COPY ./ /app
-
 # Set working directory
 WORKDIR /app
-
 # Install app dependencies
-RUN npm install
-
+RUN npm install && mkdir runtime
 CMD ["npm", "start"]
