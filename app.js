@@ -34,20 +34,20 @@ async function sendOneFile(cli, file, hotelId, socket) {
       let recordsMessage = {
         event: 'RESERVATIONS',
         data: {
-          meta: {
-            chunk_id: chunkId,
-            total_record: totalRecordCount,
-            num_of_records: chunkRecord.length,
-            file_name: file.file_name,
-            last_modified: file.last_modified,
-            hotel_code: chunkRecord[0].reservation.hotel_code,
-            hotel_id: hotelId,
-            reorder: true,
-            reorder_chunk_count: chunkInfo.totalChunkCount,
-            reorder_unique_id: uniqueFileId,
-            reorder_chunk_seq: chunkSeq,
-          },
           reservations: chunkRecord,
+        },
+        meta: {
+          chunk_id: chunkId,
+          total_record: totalRecordCount,
+          num_of_records: chunkRecord.length,
+          file_name: file.file_name,
+          last_modified: moment(file.last_modified * 1000).format('YYYY-MM-DD HH:mm:ss'),
+          hotel_code: chunkRecord[0].reservation.hotel_code,
+          hotel_id: hotelId,
+          reorder: true,
+          reorder_chunk_count: chunkInfo.totalChunkCount,
+          reorder_unique_id: uniqueFileId,
+          reorder_chunk_seq: chunkSeq,
         },
       };
       console.info('[send one file with insert chunk]', 'file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(chunkSeq, null, 2), '\n ');

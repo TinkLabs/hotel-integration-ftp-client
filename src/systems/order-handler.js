@@ -4,6 +4,7 @@ import Promise from 'bluebird';
 import AWS from 'aws-sdk';
 import lodash from 'lodash';
 import { Consumer } from 'sqs-consumer';
+import moment from 'moment';
 import {
   reorderKnex,
   REORDER_STATUS,
@@ -13,12 +14,25 @@ import {
 
 let sqs = new AWS.SQS({ region: 'ap-southeast-1' });
 
-async function sendToHaiQueue(raw) {
+function parserHaiMessage(raw) {
   let message = JSON.parse(raw);
-  delete message.data.meta.reorder_unique_id;
-  delete message.data.meta.reorder_chunk_count;
-  delete message.data.meta.reorder;
-  delete message.data.meta.reorder_chunk_seq;
+  let meta = message.meta ? message.meta : message.data.meta;
+
+  delete meta.reorder_unique_id;
+  delete meta.reorder_chunk_count;
+  delete meta.reorder;
+  delete meta.reorder_chunk_seq;
+
+  message.meta = meta;
+
+  message.data.meta = meta;
+  message.data.meta.last_modify = moment(meta.last_modified, 'YYYY-MM-DD HH:mm:ss').format('X');
+
+  return message;
+}
+
+async function sendToHaiQueue(raw) {
+  let message = parserHaiMessage(raw);
 
   let haiQueueParams = {
     QueueUrl: process.env.HAI_QUEUE_URL,
