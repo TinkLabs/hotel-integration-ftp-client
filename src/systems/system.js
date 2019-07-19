@@ -79,6 +79,9 @@ export default class System extends EventEmitter {
 
     // eslint-disable-next-line no-cond-assign, no-await-in-loop
     while (line = await rl.next()) {
+      if (setting.encode) {
+        line = Buffer.from(line, setting.encode);
+      }
       lineNum += 1;
       if (lineNum > setting.ignoredTop && lineNum <= totalLine - setting.ignoredBot) {
         buf += line;
