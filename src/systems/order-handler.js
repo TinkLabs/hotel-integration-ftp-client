@@ -25,7 +25,7 @@ function parserHaiMessage(raw) {
 
   message.meta = meta;
 
-  message.data.meta = meta;
+  message.data.meta = lodash.clone(meta);
   message.data.meta.last_modified = moment(meta.last_modified, 'YYYY-MM-DD HH:mm:ss').format('X');
 
   return message;
