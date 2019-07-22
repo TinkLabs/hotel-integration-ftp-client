@@ -25,6 +25,7 @@ async function sleep(ms) {
 
 async function sendOneFile(cli, file, hotelId, socket) {
   let uniqueFileId = uuid();
+  console.log(`generate file id, file ${file}, id ${uniqueFileId}`);
   let chunkInfo = await cli.getFileChunkInfo(file.file_name, 150);
   try {
     await initReorderMessage(hotelId, uniqueFileId, chunkInfo.totalChunkCount);
@@ -110,11 +111,15 @@ async function run() {
   let res = await db('integration_ftp')
     .whereRaw('NOW() >= DATE_ADD(`last_connected`, INTERVAL `time_interval` MINUTE)')
     .leftJoin('integrations', 'integration_ftp.integration_id', 'integrations.id')
-    .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config', 'integrations.token');
+    .select('integration_ftp.id', 'integration_id', 'hotel_id', 'system_code', 'ftp_config', 'file_config', 'integrations.config', 'integrations.token', 'integrations.enabled');
 
   await Promise.all(
     res.map(async (record) => {
       let { token } = record;
+
+      if (record.enabled !== 1) {
+        return null;
+      }
 
       if (running.has(record.id)) {
         console.log(`hotel ${record.id} ${JSON.stringify(running)} is running, return`);
