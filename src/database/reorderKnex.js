@@ -63,6 +63,12 @@ function insertReorderMessageChunk(chunkId, msgId, seq, raw) {
   });
 }
 
+function updateRecordMessageStatus(msgId, status) {
+  return reorderKnex('reservation_reorder_messages')
+    .where('id', msgId)
+    .update({ status, modify_at: mysqlNow() });
+}
+
 async function nextMessage(hotelId) {
   let record = await reorderKnex('reservation_reorder_messages')
     .where('hotel_id', hotelId)
@@ -82,6 +88,7 @@ export {
   reorderKnex,
   REORDER_STATUS,
   initReorderMessage,
+  updateRecordMessageStatus,
   insertReorderMessageChunk,
   nextMessage,
   mysqlNow,
