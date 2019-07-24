@@ -10,7 +10,9 @@ import Socket from './src/services/socket/socketClient';
 import db from './src/database/knex';
 import {
   initReorderMessage,
+  updateRecordMessageStatus,
   insertReorderMessageChunk,
+  REORDER_STATUS,
 } from './src/database/reorderKnex';
 import { orderHandler, orderResend } from './src/systems/order-handler';
 
@@ -25,36 +27,40 @@ async function sleep(ms) {
 
 async function sendOneFile(cli, file, hotelId, socket) {
   let uniqueFileId = uuid();
-  console.log(`generate file id, file ${file}, id ${uniqueFileId}`);
+  console.log(`generate file id, file ${JSON.stringify(file)}, id ${uniqueFileId}`);
   let chunkInfo = await cli.getFileChunkInfo(file.file_name, 150);
   try {
     await initReorderMessage(hotelId, uniqueFileId, chunkInfo.totalChunkCount);
-    await cli.chunkFile(chunkInfo, async (chunkRecord, chunkSeq, totalRecordCount) => {
-      console.log('[run chunk]', chunkRecord.length, chunkSeq, totalRecordCount);
-      let chunkId = uuid();
-      let recordsMessage = {
-        event: 'RESERVATIONS',
-        data: {
-          reservations: chunkRecord,
-        },
-        meta: {
-          chunk_id: chunkId,
-          total_record: totalRecordCount,
-          num_of_records: chunkRecord.length,
-          file_name: file.file_name,
-          last_modified: moment(file.last_modified * 1000).format('YYYY-MM-DD HH:mm:ss'),
-          hotel_code: chunkRecord[0].reservation.hotel_code,
-          hotel_id: hotelId,
-          reorder: true,
-          reorder_chunk_count: chunkInfo.totalChunkCount,
-          reorder_unique_id: uniqueFileId,
-          reorder_chunk_seq: chunkSeq,
-        },
-      };
-      console.info('[send one file with insert chunk]', 'file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(chunkSeq, null, 2), '\n ');
-      await insertReorderMessageChunk(chunkId, uniqueFileId, chunkSeq, JSON.stringify(recordsMessage));
-      await socket.send(recordsMessage);
-    });
+    if (chunkInfo.totalChunkCount === 0) {
+      await updateRecordMessageStatus(uniqueFileId, REORDER_STATUS.FINISH);
+    } else {
+      await cli.chunkFile(chunkInfo, async (chunkRecord, chunkSeq, totalRecordCount) => {
+        console.log('[run chunk]', chunkRecord.length, chunkSeq, totalRecordCount);
+        let chunkId = uuid();
+        let recordsMessage = {
+          event: 'RESERVATIONS',
+          data: {
+            reservations: chunkRecord,
+          },
+          meta: {
+            chunk_id: chunkId,
+            total_record: totalRecordCount,
+            num_of_records: chunkRecord.length,
+            file_name: file.file_name,
+            last_modified: moment(file.last_modified * 1000).format('YYYY-MM-DD HH:mm:ss'),
+            hotel_code: chunkRecord[0].reservation.hotel_code,
+            hotel_id: hotelId,
+            reorder: true,
+            reorder_chunk_count: chunkInfo.totalChunkCount,
+            reorder_unique_id: uniqueFileId,
+            reorder_chunk_seq: chunkSeq,
+          },
+        };
+        console.info('[send one file with insert chunk]', 'file_id: ', uniqueFileId, ',chunk_seq: ', JSON.stringify(chunkSeq, null, 2), '\n ');
+        await insertReorderMessageChunk(chunkId, uniqueFileId, chunkSeq, JSON.stringify(recordsMessage));
+        await socket.send(recordsMessage);
+      });
+    }
   } catch (e) {
     console.log('[send one file occur error:]', e.message, e.stack);
     throw e;
