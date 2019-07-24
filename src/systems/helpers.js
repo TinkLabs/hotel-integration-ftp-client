@@ -26,6 +26,7 @@ export function parser(raw, header, footer, rdSplit, fdSplit, fieldMapping) {
 
   return records.map((record) => {
     record = record.split(fdSplit);
+    record = _.mapValues(record, _.trim);
     record = mapObj(fieldMapping, (key, value) => [key, !empty(record[value.column_index]) ? record[value.column_index] : !empty(value.default) ? value.default : null]);
 
     let checkin_datetime;
